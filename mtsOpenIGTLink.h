@@ -57,14 +57,13 @@ http://www.cisst.org/cisst/license.txt.
 #ifndef _mtsOpenIGTLink_h
 #define _mtsOpenIGTLink_h
 
+// forward declaration of private data using igtl types
+class sawOpenIGTLinkData;
+
 #include <cisstOSAbstraction/osaSocket.h>
 #include <cisstOSAbstraction/osaSocketServer.h>
 #include <cisstMultiTask/mtsTaskPeriodic.h>
 #include <cisstParameterTypes/prmPositionCartesianGet.h>
-
-#include <igtl_util.h>
-#include <igtl_header.h>
-#include <igtl_transform.h>
 
 // always include last
 #include <sawOpenIGTLink/sawOpenIGTLinkExport.h>
@@ -112,20 +111,6 @@ class CISST_EXPORT mtsOpenIGTLink: public mtsTaskPeriodic
     /*! \brief Skips the received message */
     void SkipMessage(void);
 
-    /*! \brief Hard copies the rotation and translation from a
-      prmPositionCartesianGet to a float array of size 12
-      \param frameCISST Frame to be converted
-      \param frameIGT Result of conversion */
-    void FrameCISSTtoIGT(const prmPositionCartesianGet & frameCISST,
-                         igtl_float32 * frameIGT);
-
-    /*! \brief Hard copies a float array of size 12 to the rotation and
-      translation of a prmPositionCartesianGet
-      \param frameIGT Frame to be converted
-      \param frameCISST Converted frame */
-    void FrameIGTtoCISST(const igtl_float32 * frameIGT,
-                         prmPositionCartesianGet & frameCISST);
-
     mtsFunctionRead GetPositionCartesian;
 
     enum ConnectionTypes { SERVER, CLIENT };
@@ -141,8 +126,7 @@ class CISST_EXPORT mtsOpenIGTLink: public mtsTaskPeriodic
     std::vector<osaSocket *> Sockets;
 
     std::string MessageType;
-    igtl_header HeaderIGT;
-    igtl_float32 FrameIGT[12];
+    sawOpenIGTLinkData * IGTLData;
     prmPositionCartesianGet FrameSend;
     prmPositionCartesianGet FrameRecv;
 };

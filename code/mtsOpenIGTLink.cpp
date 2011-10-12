@@ -24,6 +24,34 @@ http://www.cisst.org/cisst/license.txt.
 
 #include <sawOpenIGTLink/mtsOpenIGTLink.h>
 
+#include <igtl_util.h>
+#include <igtl_header.h>
+#include <igtl_transform.h>
+
+
+/*! \brief Hard copies the rotation and translation from a
+  prmPositionCartesianGet to a float array of size 12
+  \param frameCISST Frame to be converted
+  \param frameIGT Result of conversion */
+void mtsOpenIGTLinkFrameCISSTtoIGT(const prmPositionCartesianGet & frameCISST,
+                                   igtl_float32 * frameIGT);
+
+/*! \brief Hard copies a float array of size 12 to the rotation and
+  translation of a prmPositionCartesianGet
+  \param frameIGT Frame to be converted
+  \param frameCISST Converted frame */
+void mtsOpenIGTLinkFrameIGTtoCISST(const igtl_float32 * frameIGT,
+                                   prmPositionCartesianGet & frameCISST);
+
+
+// private data using igtl types
+class sawOpenIGTLinkData {
+public:
+    igtl_header HeaderIGT;
+    igtl_float32 FrameIGT[12];
+};
+
+
 CMN_IMPLEMENT_SERVICES(mtsOpenIGTLink);
 
 
@@ -54,6 +82,7 @@ mtsOpenIGTLink::mtsOpenIGTLink(const std::string & taskName, const double period
     IsConnected = false;
     SocketServer = 0;
     Socket = new osaSocket();
+    IGTLData = new sawOpenIGTLinkData;
     Initialize();
 }
 
@@ -65,6 +94,7 @@ mtsOpenIGTLink::~mtsOpenIGTLink(void)
     delete Socket;
     if (SocketServer) SocketServer->Close();
     delete SocketServer;
+    delete IGTLData;
 }
 
 
@@ -141,25 +171,25 @@ void mtsOpenIGTLink::Run(void)
 
 bool mtsOpenIGTLink::SendFrame(const prmPositionCartesianGet & frameCISST)
 {
-    FrameCISSTtoIGT(frameCISST, FrameIGT);
-    igtl_transform_convert_byte_order(FrameIGT);  // convert endian if necessary
+    mtsOpenIGTLinkFrameCISSTtoIGT(frameCISST, IGTLData->FrameIGT);
+    igtl_transform_convert_byte_order(IGTLData->FrameIGT);  // convert endian if necessary
 
     igtl_uint64 crc = crc64(0, 0, 0LL);  // initial CRC
 
-    HeaderIGT.version   = IGTL_HEADER_VERSION;
-    HeaderIGT.timestamp = 0;
-    HeaderIGT.body_size = IGTL_TRANSFORM_SIZE;
-    HeaderIGT.crc       = crc64(reinterpret_cast<unsigned char *>(FrameIGT),
-                                IGTL_TRANSFORM_SIZE, crc);
+    IGTLData->HeaderIGT.version   = IGTL_HEADER_VERSION;
+    IGTLData->HeaderIGT.timestamp = 0;
+    IGTLData->HeaderIGT.body_size = IGTL_TRANSFORM_SIZE;
+    IGTLData->HeaderIGT.crc       = crc64(reinterpret_cast<unsigned char *>(IGTLData->FrameIGT),
+                                          IGTL_TRANSFORM_SIZE, crc);
 
-    strncpy(HeaderIGT.name, "TRANSFORM", 12);
-    strncpy(HeaderIGT.device_name, DeviceName.c_str(), 20);
+    strncpy(IGTLData->HeaderIGT.name, "TRANSFORM", 12);
+    strncpy(IGTLData->HeaderIGT.device_name, DeviceName.c_str(), 20);
 
-    igtl_header_convert_byte_order(&HeaderIGT);  // convert endian if necessary
+    igtl_header_convert_byte_order(&(IGTLData->HeaderIGT));  // convert endian if necessary
 
-    Socket->Send(reinterpret_cast<const char *>(&HeaderIGT),
+    Socket->Send(reinterpret_cast<const char *>(&(IGTLData->HeaderIGT)),
                  IGTL_HEADER_SIZE);
-    int bytesSent = Socket->Send(reinterpret_cast<const char *>(FrameIGT),
+    int bytesSent = Socket->Send(reinterpret_cast<const char *>(IGTLData->FrameIGT),
                                  IGTL_TRANSFORM_SIZE);
     if (bytesSent == -1) {
         return false;
@@ -171,7 +201,7 @@ bool mtsOpenIGTLink::SendFrame(const prmPositionCartesianGet & frameCISST)
 
 bool mtsOpenIGTLink::ReceiveHeader(std::string & messageType)
 {
-    int bytesRead = Socket->Receive(reinterpret_cast<char *>(&HeaderIGT),
+    int bytesRead = Socket->Receive(reinterpret_cast<char *>(&(IGTLData->HeaderIGT)),
                                     IGTL_HEADER_SIZE);
     if (bytesRead == 0) {
         CMN_LOG_CLASS_RUN_DEBUG << "ReceiveHeader: no message to receive" << std::endl;
@@ -181,8 +211,8 @@ bool mtsOpenIGTLink::ReceiveHeader(std::string & messageType)
         return false;
     }
 
-    igtl_header_convert_byte_order(&HeaderIGT);  // convert endian if necessary
-    messageType.assign(HeaderIGT.name);
+    igtl_header_convert_byte_order(&(IGTLData->HeaderIGT));  // convert endian if necessary
+    messageType.assign(IGTLData->HeaderIGT.name);
     CMN_LOG_CLASS_RUN_DEBUG << "ReceiveHeader: receiving a " << messageType << std::endl;
     return true;
 }
@@ -190,15 +220,15 @@ bool mtsOpenIGTLink::ReceiveHeader(std::string & messageType)
 
 bool mtsOpenIGTLink::ReceiveFrame(prmPositionCartesianGet & frameCISST)
 {
-    int bytesRead = Socket->Receive(reinterpret_cast<char *>(FrameIGT),
+    int bytesRead = Socket->Receive(reinterpret_cast<char *>(IGTLData->FrameIGT),
                                     IGTL_TRANSFORM_SIZE);
     if (bytesRead != IGTL_TRANSFORM_SIZE) {
         CMN_LOG_CLASS_RUN_ERROR << "ReceiveFrame: size mismatch" << std::endl;
         return false;
     }
 
-    igtl_transform_convert_byte_order(FrameIGT);  // convert endian if necessary
-    FrameIGTtoCISST(FrameIGT, frameCISST);
+    igtl_transform_convert_byte_order(IGTLData->FrameIGT);  // convert endian if necessary
+    mtsOpenIGTLinkFrameIGTtoCISST(IGTLData->FrameIGT, frameCISST);
     CMN_LOG_CLASS_RUN_DEBUG << "ReceiveFrame: received " << frameCISST << std::endl;
     return true;
 }
@@ -206,7 +236,7 @@ bool mtsOpenIGTLink::ReceiveFrame(prmPositionCartesianGet & frameCISST)
 
 void mtsOpenIGTLink::SkipMessage(void)
 {
-    unsigned long long dummySize = HeaderIGT.body_size;
+    unsigned long long dummySize = IGTLData->HeaderIGT.body_size;
     const int blockSize = 512;
     char dummy[blockSize];
     int bytesRead;
@@ -218,10 +248,10 @@ void mtsOpenIGTLink::SkipMessage(void)
 }
 
 
-void mtsOpenIGTLink::FrameCISSTtoIGT(const prmPositionCartesianGet & frameCISST,
-                                     igtl_float32 * frameIGT)
+void mtsOpenIGTLinkFrameCISSTtoIGT(const prmPositionCartesianGet & frameCISST,
+                                   igtl_float32 * frameIGT)
 {
-    for (unsigned int i = 0; i < 3; i++) {
+    for (size_t i = 0; i < 3; i++) {
         frameIGT[i]   = static_cast<float>(frameCISST.Position().Rotation().Element(i,0));
         frameIGT[i+3] = static_cast<float>(frameCISST.Position().Rotation().Element(i,1));
         frameIGT[i+6] = static_cast<float>(frameCISST.Position().Rotation().Element(i,2));
@@ -230,10 +260,10 @@ void mtsOpenIGTLink::FrameCISSTtoIGT(const prmPositionCartesianGet & frameCISST,
 }
 
 
-void mtsOpenIGTLink::FrameIGTtoCISST(const igtl_float32 * frameIGT,
-                                     prmPositionCartesianGet & frameCISST)
+void mtsOpenIGTLinkFrameIGTtoCISST(const igtl_float32 * frameIGT,
+                                   prmPositionCartesianGet & frameCISST)
 {
-    for (unsigned int i = 0; i < 3; i++) {
+    for (size_t i = 0; i < 3; i++) {
         frameCISST.Position().Rotation().Element(i,0) = frameIGT[i];
         frameCISST.Position().Rotation().Element(i,1) = frameIGT[i+3];
         frameCISST.Position().Rotation().Element(i,2) = frameIGT[i+6];

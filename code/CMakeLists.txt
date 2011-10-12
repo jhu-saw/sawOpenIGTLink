@@ -37,7 +37,7 @@ if (cisst_FOUND_AS_REQUIRED)
   target_link_libraries (sawOpenIGTLink ${OpenIGTLink_LIBRARIES})
 
   set (sawOpenIGTLink_INCLUDE_DIR "${sawComponents_SOURCE_DIR}")
-  set (sawOpenIGTLink_LIBRARY_DIR "${LIBRARY_OUTPUT_PATH}")
+  set (sawOpenIGTLink_LIBRARY_DIR "${LIBRARY_OUTPUT_PATH}" "${OpenIGTLink_LIBRARY_DIRS}")
   set (sawOpenIGTLink_LIBRARIES sawOpenIGTLink ${OpenIGTLink_LIBRARIES})
 
   configure_file ("${CMAKE_CURRENT_SOURCE_DIR}/sawOpenIGTLinkConfig.cmake.in"
