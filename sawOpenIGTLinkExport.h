@@ -19,7 +19,7 @@ http://www.cisst.org/cisst/license.txt.
 */
 
 // check if this module is build as a DLL
-#ifdef sawNDITracker_EXPORTS
+#ifdef sawOpenIGTLink_EXPORTS
 #define CISST_THIS_LIBRARY_AS_DLL
 #endif
 
