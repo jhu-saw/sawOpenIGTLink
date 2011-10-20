@@ -12,6 +12,9 @@
 #
 # --- end cisst license ---
 
+# To find FindOpenIGTLink.cmake
+set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/code)
+
 find_package (OpenIGTLink REQUIRED)
 
 if (OpenIGTLink_FOUND)
