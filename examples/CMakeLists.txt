@@ -27,7 +27,7 @@ if (cisst_FOUND_AS_REQUIRED)
   include (${CISST_USE_FILE})
 
   # sawOpenIGTLink has been compiled within cisst, we should find it automatically
-  find_package (sawOpenIGTLink REQUIRED HINTS "${CISST_BINARY_DIR}/saw/components")
+  find_package (sawOpenIGTLink REQUIRED HINTS "${cisst_saw_BINARY_DIR}/saw/components")
 
   if (sawOpenIGTLink_FOUND)
 
