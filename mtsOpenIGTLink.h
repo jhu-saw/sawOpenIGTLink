@@ -21,7 +21,6 @@ http://www.cisst.org/cisst/license.txt.
 /*!
   \file
   \brief Declaration of mtsOpenIGTLink
-  \ingroup cisstDevices
 
   This is a wrapper for the Open IGT Link. It can set up both as a server or a
   client by providing the extra host argument, where you specify the hostname
