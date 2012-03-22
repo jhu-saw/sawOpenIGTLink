@@ -47,6 +47,8 @@ if (cisst_FOUND_AS_REQUIRED)
                     ${sawOpenIGTLinkExampleFLTK_FLTK_UI_SRCS}
                     )
 
+    set_property (TARGET sawOpenIGTLinkExampleFLTK PROPERTY FOLDER "sawOpenIGTLink")
+
     target_link_libraries (sawOpenIGTLinkExampleFLTK ${sawOpenIGTLink_LIBRARIES})
 
     cisst_target_link_libraries (sawOpenIGTLinkExampleFLTK ${REQUIRED_CISST_LIBRARIES})
