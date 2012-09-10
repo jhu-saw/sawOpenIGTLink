@@ -44,6 +44,7 @@ public:
     bool GetExitFlag(void);
 
 protected:
+    mtsFunctionWrite SetPositionCartesian;
     mtsFunctionRead GetPositionCartesian;
     prmPositionCartesianGet FrameSend;
     prmPositionCartesianGet FrameRecv;

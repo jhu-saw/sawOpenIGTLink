@@ -7,7 +7,7 @@
   Author(s):  Ali Uneri
   Created on: 2009-08-11
 
-  (C) Copyright 2007-2009 Johns Hopkins University (JHU), All Rights Reserved.
+  (C) Copyright 2007-2012 Johns Hopkins University (JHU), All Rights Reserved.
 
 --- begin cisst license - do not edit ---
 
@@ -20,30 +20,32 @@ http://www.cisst.org/cisst/license.txt.
 
 #include <cisstCommon/cmnLogger.h>
 #include <cisstOSAbstraction/osaSleep.h>
-
 #include <sawOpenIGTLink/mtsOpenIGTLink.h>
 
 #include "trackerSimulator.h"
 
 #define IS_SERVER 0  // make this 0 to run as a client
 
+
 int main()
 {
     // log configuration
     cmnLogger::SetMask(CMN_LOG_ALLOW_ALL);
     cmnLogger::SetMaskFunction(CMN_LOG_ALLOW_ALL);
-    cmnLogger::AddChannel(std::cout, CMN_LOG_ALLOW_ERRORS_AND_WARNINGS);
-    cmnLogger::SetMaskClassMatching("mts", CMN_LOG_ALLOW_ALL);
+    cmnLogger::SetMaskDefaultLog(CMN_LOG_ALLOW_ALL);
+    cmnLogger::SetMaskClassMatching("mtsOpenIGTLink", CMN_LOG_ALLOW_ALL);
+    cmnLogger::AddChannel(std::cerr, CMN_LOG_ALLOW_ERRORS_AND_WARNINGS);
 
     mtsComponentManager * componentManager = mtsComponentManager::GetInstance();
 
     // create components
+    mtsOpenIGTLink * mtsOpenIGTLinkObj = new mtsOpenIGTLink("MyOpenIGTLink", 50.0 * cmn_ms);
 #if IS_SERVER
     std::cout << "Running as OpenIGTLink server on port 18944" << std::endl;
-    mtsOpenIGTLink * mtsOpenIGTLinkObj = new mtsOpenIGTLink("trackerServer", 50.0 * cmn_ms, 18944);
+    mtsOpenIGTLinkObj->Configure("18944");
 #else
     std::cout << "Running as OpenIGTLink client on port localhost:18944" << std::endl;
-    mtsOpenIGTLink * mtsOpenIGTLinkObj = new mtsOpenIGTLink("trackerClient", 50.0 * cmn_ms, "localhost", 18944);
+    mtsOpenIGTLinkObj->Configure("localhost:18944");
 #endif
     trackerSimulator * trackerSimulatorObj = new trackerSimulator("trackerSimulator", 50.0 * cmn_ms);
 
@@ -53,8 +55,6 @@ int main()
     trackerSimulatorObj->Configure();
 
     // connect components
-    componentManager->Connect(mtsOpenIGTLinkObj->GetName(), "RequiresPositionCartesian",
-                              trackerSimulatorObj->GetName(), "ProvidesPositionCartesian");
     componentManager->Connect(trackerSimulatorObj->GetName(), "RequiresPositionCartesian",
                               mtsOpenIGTLinkObj->GetName(), "ProvidesPositionCartesian");
 
@@ -69,10 +69,9 @@ int main()
         osaSleep(10.0 * cmn_ms);
     }
 
-    // kill all components
+    // kill all components and perform cleanup
     componentManager->KillAll();
     componentManager->WaitForStateAll(mtsComponentState::FINISHED, 2.0 * cmn_s);
-
     componentManager->Cleanup();
 
     return 0;

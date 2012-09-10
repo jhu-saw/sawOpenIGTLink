@@ -29,19 +29,10 @@ trackerSimulator::trackerSimulator(const std::string & taskName, double period):
     mtsTaskPeriodic(taskName, period, false, 500),
     ExitFlag(false)
 {
-    // required interfaces
-    mtsInterfaceRequired * requiredInterface;
-    requiredInterface = AddInterfaceRequired("RequiresPositionCartesian");
-    if (requiredInterface) {
-        requiredInterface->AddFunction("GetPositionCartesian", GetPositionCartesian);
-    }
-
-    // provided interfaces
-    mtsInterfaceProvided * providedInterface;
-    providedInterface = AddInterfaceProvided("ProvidesPositionCartesian");
-    if (providedInterface) {
-        StateTable.AddData(FrameSend, "FrameSend");
-        providedInterface->AddCommandReadState(StateTable, FrameSend, "GetPositionCartesian");
+    mtsInterfaceRequired * requiresPositionCartesian = AddInterfaceRequired("RequiresPositionCartesian");
+    if (requiresPositionCartesian) {
+        requiresPositionCartesian->AddFunction("SetPositionCartesian", SetPositionCartesian);
+        requiresPositionCartesian->AddFunction("GetPositionCartesian", GetPositionCartesian);
     }
 }
 
@@ -75,10 +66,10 @@ void trackerSimulator::Run(void)
         FrameSend.Position().Rotation().Element(i,2) = UI.FrameSend[i+6]->value();
         FrameSend.Position().Translation().Element(i) = UI.FrameSend[i+9]->value();
     }
-
-    GetPositionCartesian(FrameRecv);
+    SetPositionCartesian(FrameSend);
 
     // set received frame on the UI
+    GetPositionCartesian(FrameRecv);
     for (unsigned int i = 0; i < 3; i++) {
         UI.FrameRecv[i]->value(FrameRecv.Position().Rotation().Element(i,0));
         UI.FrameRecv[i+3]->value(FrameRecv.Position().Rotation().Element(i,1));

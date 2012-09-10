@@ -7,7 +7,7 @@
   Author(s):  Ali Uneri
   Created on: 2009-08-10
 
-  (C) Copyright 2009-2011 Johns Hopkins University (JHU), All Rights Reserved.
+  (C) Copyright 2009-2012 Johns Hopkins University (JHU), All Rights Reserved.
 
 --- begin cisst license - do not edit ---
 
@@ -19,14 +19,14 @@ http://www.cisst.org/cisst/license.txt.
 */
 
 #include <cisstOSAbstraction/osaSleep.h>
-#include <cisstMultiTask/mtsInterfaceRequired.h>
 #include <cisstMultiTask/mtsInterfaceProvided.h>
-
 #include <sawOpenIGTLink/mtsOpenIGTLink.h>
 
 #include <igtl_util.h>
 #include <igtl_header.h>
 #include <igtl_transform.h>
+
+CMN_IMPLEMENT_SERVICES_DERIVED_ONEARG(mtsOpenIGTLink, mtsTaskPeriodic, mtsTaskPeriodicConstructorArg);
 
 
 /*! \brief Hard copies the rotation and translation from a
@@ -36,6 +36,7 @@ http://www.cisst.org/cisst/license.txt.
 void mtsOpenIGTLinkFrameCISSTtoIGT(const prmPositionCartesianGet & frameCISST,
                                    igtl_float32 * frameIGT);
 
+
 /*! \brief Hard copies a float array of size 12 to the rotation and
   translation of a prmPositionCartesianGet
   \param frameIGT Frame to be converted
@@ -44,50 +45,15 @@ void mtsOpenIGTLinkFrameIGTtoCISST(const igtl_float32 * frameIGT,
                                    prmPositionCartesianGet & frameCISST);
 
 
-// private data using igtl types
-class sawOpenIGTLinkData {
-public:
+class sawOpenIGTLinkData
+{
+ public:
     igtl_header HeaderIGT;
     igtl_float32 FrameIGT[12];
 };
 
 
-CMN_IMPLEMENT_SERVICES(mtsOpenIGTLink);
-
-
-mtsOpenIGTLink::mtsOpenIGTLink(const std::string & taskName, const double period,
-                               const unsigned short port):
-    mtsTaskPeriodic(taskName, period, false, 500)
-{
-    CMN_LOG_CLASS_INIT_VERBOSE << "mtsOpenIGTLink: setting up as server" << std::endl;
-    ConnectionType = SERVER;
-    DeviceName = taskName;
-    Port = port;
-    IsConnected = false;
-    SocketServer = new osaSocketServer();
-    Socket = 0;
-    Initialize();
-}
-
-
-mtsOpenIGTLink::mtsOpenIGTLink(const std::string & taskName, const double period,
-                               const std::string & host, const unsigned short port):
-    mtsTaskPeriodic(taskName, period, false, 500)
-{
-    CMN_LOG_CLASS_INIT_VERBOSE << "mtsOpenIGTLink: setting up as client" << std::endl;
-    ConnectionType = CLIENT;
-    DeviceName = taskName;
-    Host = host;
-    Port = port;
-    IsConnected = false;
-    SocketServer = 0;
-    Socket = new osaSocket();
-    IGTLData = new sawOpenIGTLinkData;
-    Initialize();
-}
-
-
-mtsOpenIGTLink::~mtsOpenIGTLink(void)
+void mtsOpenIGTLink::Cleanup(void)
 {
     CMN_LOG_CLASS_INIT_VERBOSE << "~mtsOpenIGTLink: closing hanging connections" << std::endl;
     if (Socket) Socket->Close();
@@ -98,21 +64,44 @@ mtsOpenIGTLink::~mtsOpenIGTLink(void)
 }
 
 
-void mtsOpenIGTLink::Initialize(void)
+void mtsOpenIGTLink::Configure(const std::string & hostAndPort)
 {
-    // required interfaces
-    mtsInterfaceRequired * requiredInterface;
-    requiredInterface = AddInterfaceRequired("RequiresPositionCartesian");
-    if (requiredInterface) {
-        requiredInterface->AddFunction("GetPositionCartesian", GetPositionCartesian);
+    // parse port and [if any] host information
+    std::string host;
+    unsigned int port;
+    size_t colonPosition = hostAndPort.find(':');
+    if (colonPosition == std::string::npos) {
+        host = "";
+        port = atoi(hostAndPort.c_str());
+    } else {
+        host = hostAndPort.substr(0, colonPosition);
+        port = atoi(hostAndPort.substr(colonPosition + 1).c_str());
     }
 
-    // provided interfaces
-    mtsInterfaceProvided * providedInterface;
-    providedInterface = AddInterfaceProvided("ProvidesPositionCartesian");
-    if (providedInterface) {
+    // if a target host is not provided, configure as server, otherwise client
+    if (host.empty()) {
+        CMN_LOG_CLASS_INIT_VERBOSE << "mtsOpenIGTLink: setting up as server" << std::endl;
+        ConnectionType = SERVER;
+        Port = port;
+        SocketServer = new osaSocketServer();
+        Socket = 0;
+    } else {
+        CMN_LOG_CLASS_INIT_VERBOSE << "mtsOpenIGTLink: setting up as client" << std::endl;
+        ConnectionType = CLIENT;
+        Host = host;
+        Port = port;
+        SocketServer = 0;
+        Socket = new osaSocket();
+        IGTLData = new sawOpenIGTLinkData;
+    }
+    IsConnected = false;
+
+    mtsInterfaceProvided * providesPositionCartesian = AddInterfaceProvided("ProvidesPositionCartesian");
+    if (providesPositionCartesian) {
+        StateTable.AddData(FrameSend, "FrameSend");
         StateTable.AddData(FrameRecv, "FrameRecv");
-        providedInterface->AddCommandReadState(StateTable, FrameRecv, "GetPositionCartesian");
+        providesPositionCartesian->AddCommandWriteState(StateTable, FrameSend, "SetPositionCartesian");
+        providesPositionCartesian->AddCommandReadState(StateTable, FrameRecv, "GetPositionCartesian");
     }
 }
 
@@ -131,6 +120,8 @@ void mtsOpenIGTLink::Startup(void)
 
 void mtsOpenIGTLink::Run(void)
 {
+    ProcessQueuedCommands();
+
     if (!IsConnected) {
         if (ConnectionType == SERVER) {
             do {
@@ -143,11 +134,10 @@ void mtsOpenIGTLink::Run(void)
     }
 
     if (IsConnected) {
-        GetPositionCartesian(FrameSend);
         // assume the device is disconnected, if it is not able to send a message
         IsConnected = SendFrame(FrameSend);
 
-        // if there is message
+        // (nonblocking) check for incoming message
         if (ReceiveHeader(MessageType)) {
             if (MessageType.compare("TRANSFORM") == 0) {
                 ReceiveFrame(FrameRecv);
@@ -183,7 +173,7 @@ bool mtsOpenIGTLink::SendFrame(const prmPositionCartesianGet & frameCISST)
                                           IGTL_TRANSFORM_SIZE, crc);
 
     strncpy(IGTLData->HeaderIGT.name, "TRANSFORM", 12);
-    strncpy(IGTLData->HeaderIGT.device_name, DeviceName.c_str(), 20);
+    strncpy(IGTLData->HeaderIGT.device_name, GetName().c_str(), 20);
 
     igtl_header_convert_byte_order(&(IGTLData->HeaderIGT));  // convert endian if necessary
 
