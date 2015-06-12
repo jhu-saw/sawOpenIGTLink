@@ -1,7 +1,5 @@
 #
-#
-# (C) Copyright 2011 Johns Hopkins University (JHU), All Rights
-# Reserved.
+# (C) Copyright 2011-2015 Johns Hopkins University (JHU), All Rights Reserved.
 #
 # --- begin cisst license - do not edit ---
 #
@@ -43,8 +41,12 @@ if (OpenIGTLink_FOUND)
     set (sawOpenIGTLink_HEADER_DIR "${sawOpenIGTLink_INCLUDE_DIR}/sawOpenIGTLink")
     add_library (sawOpenIGTLink ${IS_SHARED}
                  ${sawOpenIGTLink_HEADER_DIR}/sawOpenIGTLinkExport.h
+                 # old implementation
                  mtsOpenIGTLink.cpp
                  ${sawOpenIGTLink_HEADER_DIR}/mtsOpenIGTLink.h
+                 # new implementation (05/2015)
+                 mtsOpenIGTLinkBridge.cpp
+                 ${sawOpenIGTLink_HEADER_DIR}/mtsOpenIGTLinkBridge.h
                  )
     set_property (TARGET sawOpenIGTLink PROPERTY FOLDER "sawOpenIGTLink")
     target_link_libraries (sawOpenIGTLink ${OpenIGTLink_LIBRARIES})
