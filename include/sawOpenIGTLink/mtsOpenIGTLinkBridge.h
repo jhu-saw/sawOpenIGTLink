@@ -92,7 +92,8 @@ class CISST_EXPORT mtsOpenIGTLinkBridge: public mtsTaskPeriodic
     igtl::ServerSocket::Pointer serverSocket;
     igtl::ClientSocket::Pointer clientSocket;
 
-    igtl::Socket::Pointer socket;
+    igtl::Socket::Pointer socket[20];
+    unsigned int NbSockets;
 
     std::string Host;
     int ServerPort;

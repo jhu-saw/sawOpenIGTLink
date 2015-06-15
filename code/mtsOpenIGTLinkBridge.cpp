@@ -74,6 +74,7 @@ void mtsOpenIGTLinkBridge::Configure(const std::string & hostAndPort)
 
 void mtsOpenIGTLinkBridge::Startup(void)
 {
+    NbSockets = 0;
     if (ConnectionType == SERVER) {
         int r = serverSocket->CreateServer(ServerPort);
         if (r<0){
@@ -88,24 +89,78 @@ void mtsOpenIGTLinkBridge::Run(void)
 {
     ProcessQueuedCommands();
 
-    if (!IsConnected) {
-        if (ConnectionType == SERVER) {
-            do {
-                socket = serverSocket->WaitForConnection(1000);
-            } while (!socket.IsNotNull());
-            IsConnected = true;
-        }//  else if (ConnectionType == CLIENT) {
+    std::cout<<"Application is running"<<std::endl;
+
+    //if (!IsConnected) {
+        if (ConnectionType == SERVER)
+        {
+            // first  to make sure socket is not null
+            std::cerr << "waiting for connection" << std::endl;
+            socket[NbSockets] = serverSocket->WaitForConnection(1);
+            if (socket[NbSockets].IsNotNull()) {
+                NbSockets++;
+                std::string address;
+                int port;
+                socket[NbSockets - 1]->GetSocketAddressAndPort(address, port);
+                std::cerr << "Detected new client " << address << ":" << port << std::endl;
+            }
+            if (NbSockets > 0) {
+                std::cout<<"Get position"<<std::endl;
+                GetPositionCartesian(PositionCartesian);
+                igtl::TransformMessage::Pointer transMsg;
+                transMsg = igtl::TransformMessage::New();
+                transMsg->SetDeviceName("OpenIGTLink_USProbe");
+
+                igtl::Matrix4x4 dataMatrix;
+                prmPositionCartesianToOIGTL(PositionCartesian, dataMatrix);
+                transMsg->SetMatrix(dataMatrix);
+                transMsg->Pack();
+                std::cerr << "sending to " << NbSockets << " clients ";
+                for (unsigned int s = 0; s < NbSockets; ++s) {
+                    std::cerr << " " << s;
+                    if (socket[s]->GetConnected() == 0) {
+                        std::cerr << "YEAH, detected disconnected client!" << std::endl;
+                    } else {
+                        std::cerr << "["
+                                  << socket[s]->Send(transMsg->GetPackPointer(), transMsg->GetPackSize())
+                                  << "]";
+                    }
+                }
+                std::cerr << std::endl;
+            }
+        }
+        //  else if (ConnectionType == CLIENT)
+        // {
         //     IsConnected = Socket->Connect(Host.c_str(), Port);
         // }
-    }
-     
+        /*
+        if((ConnectionType==CLIENT && IsConnected)||ConnectionType == SERVER && socket.IsNotNull())
+        {
+            IsConnected = true;
+            std::cout<<"Server / Client is running"<<std::endl;
+        }
+        */
+    //}
+
+    /*
+    std::cout<<"Get position"<<std::endl;
     GetPositionCartesian(PositionCartesian);
 
-    if (!serverSocket->GetConnected()) {
-        IsConnected = false;
+    std::cerr<<socket.IsNotNull()<<std::endl;
+
+    if (IsConnected && ConnectionType==SERVER)
+    {
+        if(!socket.IsNotNull())
+        {
+            std::cout<<"Check if server is connected"<<std::endl;
+            IsConnected = false;
+            serverSocket->CloseSocket();
+            //std::cout<<"Connection Lost"<<std::endl;
+        }
     }
+
        
-    if (IsConnected) {
+    if (IsConnected && socket.IsNotNull()) {
         std::cerr << ".";
         igtl::TransformMessage::Pointer transMsg;
         transMsg = igtl::TransformMessage::New();
@@ -119,6 +174,7 @@ void mtsOpenIGTLinkBridge::Run(void)
         
         igtl::PrintMatrix(dataMatrix);
     }
+    */
 }
 
 
