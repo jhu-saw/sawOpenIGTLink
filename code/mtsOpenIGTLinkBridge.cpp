@@ -73,11 +73,21 @@ bool mtsOpenIGTLinkBridge::AddServerFromCommandRead(const int port, const std::s
     bridge->Name = igtlFrameName;
     bridge->ServerSocket = igtl::ServerSocket::New();
 
-    // create cisst/SAW interface required
-    bridge->InterfaceRequired = AddInterfaceRequired(interfaceRequiredName);
+    // find or create cisst/SAW interface required
+    bridge->InterfaceRequired = GetInterfaceRequired(interfaceRequiredName);
+    if (!bridge->InterfaceRequired) {
+        bridge->InterfaceRequired = AddInterfaceRequired(interfaceRequiredName);
+    }
     if (bridge->InterfaceRequired) {
-        // gets tool cartesian pose from mtsNDITracker
-        bridge->InterfaceRequired->AddFunction(commandName, bridge->ReadFunction);
+        // add read function
+        if (!bridge->InterfaceRequired->AddFunction(commandName, bridge->ReadFunction)) {
+            CMN_LOG_CLASS_INIT_ERROR << "AddServerFromReadCommand: can't add function \""
+                                     << commandName << "\" to interface \""
+                                     << interfaceRequiredName << "\", it probably already exists"
+                                     << std::endl;
+            delete bridge;
+            return false;
+        }
     } else {
         CMN_LOG_CLASS_INIT_ERROR << "AddServerFromReadCommand: can't create interface \""
                                  << interfaceRequiredName << "\", it probably already exists"
@@ -130,51 +140,61 @@ void mtsOpenIGTLinkBridge::Run(void)
             bridge->Sockets.push_back(newSocket);
         }
 
-        // get data if we have any socket
+        // get data if we have any socket and check if it's valid
+        bool dataNeedsSend = false;
         if (!bridge->Sockets.empty()) {
-            bridge->ReadFunction(bridge->PositionCartesian);
+            mtsExecutionResult result;
+            result = bridge->ReadFunction(bridge->PositionCartesian);
+            if (result.IsOK()) {
+                dataNeedsSend = bridge->PositionCartesian.Valid();
+            } else {
+                dataNeedsSend = false;
+            }
+        }
+
+        if (dataNeedsSend) {
             igtl::Matrix4x4 dataMatrix;
             bridge->CISSTToIGT(bridge->PositionCartesian, dataMatrix);
             bridge->TransformMessage->SetMatrix(dataMatrix);
             bridge->TransformMessage->Pack();
-        }
 
-        typedef std::list<mtsOpenIGTLinkBridgeData::SocketsType::iterator> RemovedType;
-        RemovedType toBeRemoved;
+            typedef std::list<mtsOpenIGTLinkBridgeData::SocketsType::iterator> RemovedType;
+            RemovedType toBeRemoved;
 
-        // send to all clients of this server
-        const mtsOpenIGTLinkBridgeData::SocketsType::iterator endSockets = bridge->Sockets.end();
-        mtsOpenIGTLinkBridgeData::SocketsType::iterator socketIter;
-        for (socketIter = bridge->Sockets.begin();
-             socketIter != endSockets;
-             ++socketIter) {
-            igtl::Socket::Pointer socket = *socketIter;
-            // keep track of which client we can send to
-            int clientActive =
-                socket->Send(bridge->TransformMessage->GetPackPointer(),
-                             bridge->TransformMessage->GetPackSize());
-            // remove the client if we can't send
-            if (clientActive == 0) {
-                // log some information and remove from list
-                std::string address;
-                int port;
-                socket->GetSocketAddressAndPort(address, port);
-                CMN_LOG_CLASS_RUN_VERBOSE << "Can't send to client for bridge \""
-                                          << bridge->Name << " from "
-                                          << address << ":" << port
-                                          << std::endl;
-                toBeRemoved.push_back(socketIter);
+            // send to all clients of this server
+            const mtsOpenIGTLinkBridgeData::SocketsType::iterator endSockets = bridge->Sockets.end();
+            mtsOpenIGTLinkBridgeData::SocketsType::iterator socketIter;
+            for (socketIter = bridge->Sockets.begin();
+                 socketIter != endSockets;
+                 ++socketIter) {
+                igtl::Socket::Pointer socket = *socketIter;
+                // keep track of which client we can send to
+                int clientActive =
+                    socket->Send(bridge->TransformMessage->GetPackPointer(),
+                                 bridge->TransformMessage->GetPackSize());
+                // remove the client if we can't send
+                if (clientActive == 0) {
+                    // log some information and remove from list
+                    std::string address;
+                    int port;
+                    socket->GetSocketAddressAndPort(address, port);
+                    CMN_LOG_CLASS_RUN_VERBOSE << "Can't send to client for bridge \""
+                                              << bridge->Name << " from "
+                                              << address << ":" << port
+                                              << std::endl;
+                    toBeRemoved.push_back(socketIter);
+                }
             }
-        }
-        // remove all sockets we identified as inactive
-        const RemovedType::iterator removedEnd = toBeRemoved.end();
-        RemovedType::iterator removedIter;
-        for (removedIter = toBeRemoved.begin();
-             removedIter != removedEnd;
-             ++removedIter) {
-            CMN_LOG_CLASS_RUN_VERBOSE << "Removing client socket for bridge \""
-                                      << bridge->Name << "\"" << std::endl;
-            bridge->Sockets.erase(*removedIter);
+            // remove all sockets we identified as inactive
+            const RemovedType::iterator removedEnd = toBeRemoved.end();
+            RemovedType::iterator removedIter;
+            for (removedIter = toBeRemoved.begin();
+                 removedIter != removedEnd;
+                 ++removedIter) {
+                CMN_LOG_CLASS_RUN_VERBOSE << "Removing client socket for bridge \""
+                                          << bridge->Name << "\"" << std::endl;
+                bridge->Sockets.erase(*removedIter);
+            }
         }
     }
 }
