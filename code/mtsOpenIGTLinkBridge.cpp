@@ -16,171 +16,172 @@ http://www.cisst.org/cisst/license.txt.
 --- end cisst license ---
 */
 
-#include <cisstOSAbstraction/osaSleep.h>
-#include <cisstMultiTask/mtsInterfaceRequired.h>
+
+#include <igtl/igtlOSUtil.h>
+#include <igtl/igtlTransformMessage.h>
+#include <igtl/igtlServerSocket.h>
+
 #include <sawOpenIGTLink/mtsOpenIGTLinkBridge.h>
+#include <cisstMultiTask/mtsInterfaceRequired.h>
+#include <cisstParameterTypes/prmPositionCartesianGet.h>
 
 CMN_IMPLEMENT_SERVICES_DERIVED_ONEARG(mtsOpenIGTLinkBridge, mtsTaskPeriodic, mtsTaskPeriodicConstructorArg);
+
+
+
+class mtsOpenIGTLinkBridgeData {
+public:
+    int Port;
+    std::string Name;
+
+    igtl::ServerSocket::Pointer ServerSocket;
+    igtl::TransformMessage::Pointer TransformMessage;
+    typedef std::list<igtl::Socket::Pointer> SocketsType;
+    SocketsType Sockets;
+
+    mtsInterfaceRequired * InterfaceRequired;
+    mtsFunctionRead ReadFunction;
+    prmPositionCartesianGet PositionCartesian;
+
+    // takes in cisst frame and outputs igtl frame
+    void CISSTToIGT(const prmPositionCartesianGet & cisstData,
+                    igtl::Matrix4x4 & igtData);
+};
+
 
 void mtsOpenIGTLinkBridge::Cleanup(void)
 {
     CMN_LOG_CLASS_INIT_VERBOSE << "~mtsOpenIGTLinkBridge: closing hanging connections" << std::endl;
-    if (serverSocket) serverSocket->CloseSocket();
+    // iterate on all "bridges", i.e. igtl servers
+    const BridgesType::iterator endBridges = Bridges.end();
+    BridgesType::iterator bridgeIter;
+    for (bridgeIter = Bridges.begin();
+         bridgeIter != endBridges;
+         ++bridgeIter) {
+        mtsOpenIGTLinkBridgeData * bridge = *bridgeIter;
+        bridge->ServerSocket->CloseSocket();
+    }
 }
 
 
-void mtsOpenIGTLinkBridge::Configure(const std::string & hostAndPort)
+bool mtsOpenIGTLinkBridge::AddServerFromCommandRead(const int port, const std::string & igtlFrameName,
+                                                    const std::string & interfaceRequiredName,
+                                                    const std::string & commandName)
 {
-    // // parse port and [if any] host information
-    std::string host;
-    unsigned int port;
-    size_t colonPosition = hostAndPort.find(':');
-    if (colonPosition == std::string::npos) {
-        host = "";
-        port = atoi(hostAndPort.c_str());
-    } else {
-        host = hostAndPort.substr(0, colonPosition);
-        port = atoi(hostAndPort.substr(colonPosition + 1).c_str());
-    }
+    mtsOpenIGTLinkBridgeData * bridge = new mtsOpenIGTLinkBridgeData;
+    bridge->Port = port;
+    bridge->Name = igtlFrameName;
+    bridge->ServerSocket = igtl::ServerSocket::New();
 
-    // if a target host is not provided, configure as server, otherwise client
-    if (host.empty()) {
-        //CMN_LOG_CLASS_INIT_VERBOSE << "mtsOpenIGTLinkBridge: setting up as server" << std::endl;
-        std::cout << "mtsOpenIGTLinkBridge: setting up as server in port: " << port << std::endl; 
-        ConnectionType = SERVER;
-        serverSocket = igtl::ServerSocket::New();
-        ServerPort = port;
-    } else {
-        CMN_LOG_CLASS_INIT_VERBOSE << "mtsOpenIGTLinkBridge: setting up as client" << std::endl;
-        // ConnectionType = CLIENT;
-        // Host = host;
-        // Port = port;
-        // SocketServer = 0;
-        // Socket = new osaSocket();
-        // IGTLData = new sawOpenIGTLinkData;
-    }
-    IsConnected = false;
-
-    /* The required interface that:
-       1. grabs data from a provided interface (sawNDITracker for example)
-       2. publishes data in form of openigtlink */
-    mtsInterfaceRequired * requiresPositionCartesion = AddInterfaceRequired("requiresPositionCartesian");
-    if (requiresPositionCartesion){
+    // create cisst/SAW interface required
+    bridge->InterfaceRequired = AddInterfaceRequired(interfaceRequiredName);
+    if (bridge->InterfaceRequired) {
         // gets tool cartesian pose from mtsNDITracker
-        requiresPositionCartesion->AddFunction("GetPositionCartesian", this->GetPositionCartesian);
+        bridge->InterfaceRequired->AddFunction(commandName, bridge->ReadFunction);
+    } else {
+        CMN_LOG_CLASS_INIT_ERROR << "AddServerFromReadCommand: can't create interface \""
+                                 << interfaceRequiredName << "\", it probably already exists"
+                                 << std::endl;
+        delete bridge;
+        return false;
     }
-}
 
-
-void mtsOpenIGTLinkBridge::Startup(void)
-{
-    NbSockets = 0;
-    if (ConnectionType == SERVER) {
-        int r = serverSocket->CreateServer(ServerPort);
-        if (r<0){
-            CMN_LOG_CLASS_INIT_VERBOSE << "Cannot create a server socket" << std::endl;
-            exit(0);
-        }
+    // create igtl server
+    int result = bridge->ServerSocket->CreateServer(bridge->Port);
+    if (result < 0) {
+        CMN_LOG_CLASS_INIT_ERROR << "AddServerFromReadCommand: can't create server socket on port "
+                                 << bridge->Port << std::endl;
+        delete bridge;
+        return false;
     }
-}
+    bridge->TransformMessage = igtl::TransformMessage::New();
+    bridge->TransformMessage->SetDeviceName(bridge->Name.c_str());
 
+    // and finally add to list of bridges
+    Bridges.push_back(bridge);
+    return true;
+}
 
 void mtsOpenIGTLinkBridge::Run(void)
 {
     ProcessQueuedCommands();
+    ProcessQueuedEvents();
 
-    std::cout<<"Application is running"<<std::endl;
+    igtl::Socket::Pointer newSocket;
 
-    //if (!IsConnected) {
-        if (ConnectionType == SERVER)
-        {
-            // first  to make sure socket is not null
-            std::cerr << "waiting for connection" << std::endl;
-            socket[NbSockets] = serverSocket->WaitForConnection(1);
-            if (socket[NbSockets].IsNotNull()) {
-                NbSockets++;
+    // iterate on all "bridges", i.e. igtl servers
+    const BridgesType::iterator endBridges = Bridges.end();
+    BridgesType::iterator bridgeIter;
+    for (bridgeIter = Bridges.begin();
+         bridgeIter != endBridges;
+         ++bridgeIter) {
+        mtsOpenIGTLinkBridgeData * bridge = *bridgeIter;
+
+        // first see if we have any new client
+        newSocket = bridge->ServerSocket->WaitForConnection(1);
+        if (newSocket.IsNotNull()) {
+            // log some information and add to list
+            std::string address;
+            int port;
+            newSocket->GetSocketAddressAndPort(address, port);
+            CMN_LOG_CLASS_RUN_VERBOSE << "Found new client for bridge \""
+                                      << bridge->Name << " from "
+                                      << address << ":" << port << std::endl;
+            bridge->Sockets.push_back(newSocket);
+        }
+
+        // get data if we have any socket
+        if (!bridge->Sockets.empty()) {
+            bridge->ReadFunction(bridge->PositionCartesian);
+            igtl::Matrix4x4 dataMatrix;
+            bridge->CISSTToIGT(bridge->PositionCartesian, dataMatrix);
+            bridge->TransformMessage->SetMatrix(dataMatrix);
+            bridge->TransformMessage->Pack();
+        }
+
+        typedef std::list<mtsOpenIGTLinkBridgeData::SocketsType::iterator> RemovedType;
+        RemovedType toBeRemoved;
+
+        // send to all clients of this server
+        const mtsOpenIGTLinkBridgeData::SocketsType::iterator endSockets = bridge->Sockets.end();
+        mtsOpenIGTLinkBridgeData::SocketsType::iterator socketIter;
+        for (socketIter = bridge->Sockets.begin();
+             socketIter != endSockets;
+             ++socketIter) {
+            igtl::Socket::Pointer socket = *socketIter;
+            // keep track of which client we can send to
+            int clientActive =
+                socket->Send(bridge->TransformMessage->GetPackPointer(),
+                             bridge->TransformMessage->GetPackSize());
+            // remove the client if we can't send
+            if (clientActive == 0) {
+                // log some information and remove from list
                 std::string address;
                 int port;
-                socket[NbSockets - 1]->GetSocketAddressAndPort(address, port);
-                std::cerr << "Detected new client " << address << ":" << port << std::endl;
-            }
-            if (NbSockets > 0) {
-                std::cout<<"Get position"<<std::endl;
-                GetPositionCartesian(PositionCartesian);
-                igtl::TransformMessage::Pointer transMsg;
-                transMsg = igtl::TransformMessage::New();
-                transMsg->SetDeviceName("OpenIGTLink_USProbe");
-
-                igtl::Matrix4x4 dataMatrix;
-                prmPositionCartesianToOIGTL(PositionCartesian, dataMatrix);
-                transMsg->SetMatrix(dataMatrix);
-                transMsg->Pack();
-                std::cerr << "sending to " << NbSockets << " clients ";
-                for (unsigned int s = 0; s < NbSockets; ++s) {
-                    std::cerr << " " << s;
-                    if (socket[s]->GetConnected() == 0) {
-                        std::cerr << "YEAH, detected disconnected client!" << std::endl;
-                    } else {
-                        std::cerr << "["
-                                  << socket[s]->Send(transMsg->GetPackPointer(), transMsg->GetPackSize())
-                                  << "]";
-                    }
-                }
-                std::cerr << std::endl;
+                socket->GetSocketAddressAndPort(address, port);
+                CMN_LOG_CLASS_RUN_VERBOSE << "Can't send to client for bridge \""
+                                          << bridge->Name << " from "
+                                          << address << ":" << port
+                                          << std::endl;
+                toBeRemoved.push_back(socketIter);
             }
         }
-        //  else if (ConnectionType == CLIENT)
-        // {
-        //     IsConnected = Socket->Connect(Host.c_str(), Port);
-        // }
-        /*
-        if((ConnectionType==CLIENT && IsConnected)||ConnectionType == SERVER && socket.IsNotNull())
-        {
-            IsConnected = true;
-            std::cout<<"Server / Client is running"<<std::endl;
-        }
-        */
-    //}
-
-    /*
-    std::cout<<"Get position"<<std::endl;
-    GetPositionCartesian(PositionCartesian);
-
-    std::cerr<<socket.IsNotNull()<<std::endl;
-
-    if (IsConnected && ConnectionType==SERVER)
-    {
-        if(!socket.IsNotNull())
-        {
-            std::cout<<"Check if server is connected"<<std::endl;
-            IsConnected = false;
-            serverSocket->CloseSocket();
-            //std::cout<<"Connection Lost"<<std::endl;
+        // remove all sockets we identified as inactive
+        const RemovedType::iterator removedEnd = toBeRemoved.end();
+        RemovedType::iterator removedIter;
+        for (removedIter = toBeRemoved.begin();
+             removedIter != removedEnd;
+             ++removedIter) {
+            CMN_LOG_CLASS_RUN_VERBOSE << "Removing client socket for bridge \""
+                                      << bridge->Name << "\"" << std::endl;
+            bridge->Sockets.erase(*removedIter);
         }
     }
-
-       
-    if (IsConnected && socket.IsNotNull()) {
-        std::cerr << ".";
-        igtl::TransformMessage::Pointer transMsg;
-        transMsg = igtl::TransformMessage::New();
-        transMsg->SetDeviceName("OpenIGTLink_USProbe");
-
-        igtl::Matrix4x4 dataMatrix;
-        prmPositionCartesianToOIGTL(PositionCartesian, dataMatrix);
-        transMsg->SetMatrix(dataMatrix);
-        transMsg->Pack();
-        socket->Send(transMsg->GetPackPointer(), transMsg->GetPackSize());
-        
-        igtl::PrintMatrix(dataMatrix);
-    }
-    */
 }
 
-
-void mtsOpenIGTLinkBridge::prmPositionCartesianToOIGTL(const prmPositionCartesianGet& frameCISST,
-                                                 igtl::Matrix4x4& frameIGTL){
-
+void mtsOpenIGTLinkBridgeData::CISSTToIGT(const prmPositionCartesianGet & frameCISST,
+                                          igtl::Matrix4x4 & frameIGTL)
+{
     frameIGTL[0][0] = frameCISST.Position().Rotation().Element(0,0);
     frameIGTL[1][0] = frameCISST.Position().Rotation().Element(1,0);
     frameIGTL[2][0] = frameCISST.Position().Rotation().Element(2,0);
@@ -200,5 +201,4 @@ void mtsOpenIGTLinkBridge::prmPositionCartesianToOIGTL(const prmPositionCartesia
     frameIGTL[1][3] = frameCISST.Position().Translation().Element(1);
     frameIGTL[2][3] = frameCISST.Position().Translation().Element(2);
     frameIGTL[3][3] = 1;
-
 }

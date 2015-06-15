@@ -49,16 +49,11 @@ http://www.cisst.org/cisst/license.txt.
 #ifndef _mtsOpenIGTLinkBridge_h
 #define _mtsOpenIGTLinkBridge_h
 
-#include <igtl/igtlOSUtil.h>
-#include <igtl/igtlTransformMessage.h>
-#include <igtl/igtlServerSocket.h>
-
 #include <cisstMultiTask/mtsTaskPeriodic.h>
-#include <cisstParameterTypes/prmPositionCartesianGet.h>
 #include <sawOpenIGTLink/sawOpenIGTLinkExport.h>
 
 
-
+class mtsOpenIGTLinkBridgeData;
 
 class CISST_EXPORT mtsOpenIGTLinkBridge: public mtsTaskPeriodic
 {
@@ -66,42 +61,30 @@ class CISST_EXPORT mtsOpenIGTLinkBridge: public mtsTaskPeriodic
 
  public:
     /*! Constructors */
-    mtsOpenIGTLinkBridge(const std::string & taskName, const double period) :
-        mtsTaskPeriodic(taskName, period, false, 500) {}
-    mtsOpenIGTLinkBridge(const mtsTaskPeriodicConstructorArg & arg) :
+    inline mtsOpenIGTLinkBridge(const std::string & componentName, const double period) :
+        mtsTaskPeriodic(componentName, period, false, 500) {}
+
+    inline mtsOpenIGTLinkBridge(const mtsTaskPeriodicConstructorArg & arg) :
         mtsTaskPeriodic(arg) {}
 
     /*! Destructor */
-    ~mtsOpenIGTLinkBridge(void) {}
+    inline ~mtsOpenIGTLinkBridge(void) {}
 
-    void Configure(const std::string & hostAndPort);
-    void Startup(void);
+    inline void Configure(const std::string & CMN_UNUSED(s)) {};
+    inline void Startup(void) {};
     void Run(void);
     void Cleanup(void);
 
+    bool AddServerFromCommandRead(const int port, const std::string & igtlFrameName,
+                                  const std::string & interfaceRequiredName,
+                                  const std::string & commandName = "GetPositionCartesian");
+
  protected:
 
-    // takes in cisst frame and outputs igtl frame
-    void prmPositionCartesianToOIGTL(const prmPositionCartesianGet& frameCISST,
-                                     igtl::Matrix4x4& frameIGTL);
-    
     enum ConnectionTypes { SERVER, CLIENT };
-    int ConnectionType;
-    bool IsConnected;
 
-    igtl::ServerSocket::Pointer serverSocket;
-    igtl::ClientSocket::Pointer clientSocket;
-
-    igtl::Socket::Pointer socket[20];
-    unsigned int NbSockets;
-
-    std::string Host;
-    int ServerPort;
-    int ClientPort;
-    
-    mtsFunctionRead GetPositionCartesian;
-    prmPositionCartesianGet PositionCartesian;
-
+    typedef std::list<mtsOpenIGTLinkBridgeData *> BridgesType;
+    BridgesType Bridges;
 };
 
 CMN_DECLARE_SERVICES_INSTANTIATION(mtsOpenIGTLinkBridge);
