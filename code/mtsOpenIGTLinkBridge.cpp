@@ -60,6 +60,19 @@ void mtsOpenIGTLinkBridge::Cleanup(void)
          ++bridgeIter) {
         mtsOpenIGTLinkBridgeData * bridge = *bridgeIter;
         bridge->ServerSocket->CloseSocket();
+
+        // iterate on all sockets of bridge, i.e. igtl server
+        typedef mtsOpenIGTLinkBridgeData::SocketsType SocketsType;
+        const SocketsType::iterator endSocket = bridge->Sockets.end();
+        SocketsType::iterator socketIter ;
+        for (socketIter = bridge->Sockets.begin();
+             socketIter != endSocket;
+             ++socketIter) {
+            igtl::Socket::Pointer socket = *socketIter;
+            socket->CloseSocket();
+            socket->Delete();
+        }
+        bridge->ServerSocket->Delete();
     }
 }
 
@@ -72,11 +85,15 @@ bool mtsOpenIGTLinkBridge::AddServerFromCommandRead(const int port, const std::s
     bridge->Port = port;
     bridge->Name = igtlFrameName;
     bridge->ServerSocket = igtl::ServerSocket::New();
+    bool newInterface;
 
     // find or create cisst/SAW interface required
     bridge->InterfaceRequired = GetInterfaceRequired(interfaceRequiredName);
     if (!bridge->InterfaceRequired) {
         bridge->InterfaceRequired = AddInterfaceRequired(interfaceRequiredName);
+        newInterface = true;
+    } else {
+        newInterface = false;
     }
     if (bridge->InterfaceRequired) {
         // add read function
@@ -101,6 +118,9 @@ bool mtsOpenIGTLinkBridge::AddServerFromCommandRead(const int port, const std::s
     if (result < 0) {
         CMN_LOG_CLASS_INIT_ERROR << "AddServerFromReadCommand: can't create server socket on port "
                                  << bridge->Port << std::endl;
+        if (newInterface) {
+           this->RemoveInterfaceRequired(interfaceRequiredName);
+        }
         delete bridge;
         return false;
     }
