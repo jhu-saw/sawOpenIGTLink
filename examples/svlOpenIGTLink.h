@@ -17,14 +17,19 @@
 #include <igtl/igtlPositionMessage.h>
 #include <igtl/igtl_util.h>
 
+class svlOpenIGTLinkImageServer;
+
 class svlOpenIGTLinkBridge : public svlFilterBase
 {
 public:
     svlOpenIGTLinkBridge();
+
+    svlOpenIGTLinkImageServer* IGTLImageServer;
+
     igtl::ImageMessage::Pointer IGTOutputLeft;
     igtl::ImageMessage::Pointer IGTOutputRight;
     igtl::ServerSocket::Pointer IGTServerSocket;
-    igtl::Socket::Pointer socket;
+    igtl::Socket::Pointer socket;       // std::list sockets
     int NumberOfClients;
     igtl::Matrix4x4 IGTLMatrix;
 

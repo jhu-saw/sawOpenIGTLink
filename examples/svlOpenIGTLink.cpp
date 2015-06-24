@@ -5,6 +5,59 @@
 
 #include "svlOpenIGTLink.h"
 
+class svlOpenIGTLinkImageServer {
+public:
+
+    int Port;
+    std::string DeviceName;
+    igtl::ServerSocket::Pointer ServerSocket;
+    igtl::ImageMessage::Pointer IGTLImageMessage;
+    igtl::Matrix4x4 IGTLImageMatrix;
+    typedef std::list<igtl::Socket::Pointer> SocketsType;
+    SocketsType Sockets;
+
+    void InitializeIGTLData();
+    void InitializeIGTServerSocket(int port);
+};
+
+void svlOpenIGTLinkImageServer::InitializeIGTLData()
+{
+    // Assign image transformation matrix
+    this->IGTLImageMatrix[0][0] = -1.0;  this->IGTLImageMatrix[1][0] = 0.0;  this->IGTLImageMatrix[2][0] = 0.0; this->IGTLImageMatrix[3][0] = 0.0;
+    this->IGTLImageMatrix[0][1] = 0.0;  this->IGTLImageMatrix[1][1] = -1.0;  this->IGTLImageMatrix[2][1] = 0.0; this->IGTLImageMatrix[3][1] = 0.0;
+    this->IGTLImageMatrix[0][2] = 0.0;  this->IGTLImageMatrix[1][2] = 0.0;  this->IGTLImageMatrix[2][2] = 1.0; this->IGTLImageMatrix[3][2] = 0.0;
+    this->IGTLImageMatrix[0][3] = 0.0;  this->IGTLImageMatrix[1][3] = 0.0;  this->IGTLImageMatrix[2][3] = 0.0; this->IGTLImageMatrix[3][3] = 1.0;
+
+    // Hard code image size -> NEEDS CHANGE (ideally image size automatically determined based on input stream data)
+    // subOffset ??
+    int imageSizePixels[3]={720,480,1}, subOffset[3]={0};
+
+    // Initialize image message fixed data and allocate memory space
+    this->IGTLImageMessage = igtl::ImageMessage::New();
+    this->IGTLImageMessage->SetDimensions(imageSizePixels);
+    this->IGTLImageMessage->SetDeviceName(this->DeviceName.c_str());
+    this->IGTLImageMessage->SetScalarType(igtl::ImageMessage::TYPE_UINT8);
+    this->IGTLImageMessage->SetOrigin(0.0, 0.0, 0.0);
+    this->IGTLImageMessage->SetSpacing(1.0, 1.0, 1.0);
+    this->IGTLImageMessage->SetEndian(igtl_is_little_endian() ? igtl::ImageMessage::ENDIAN_LITTLE : igtl::ImageMessage::ENDIAN_BIG);
+    this->IGTLImageMessage->SetSubVolume( imageSizePixels, subOffset );
+    this->IGTLImageMessage->SetNumComponents(3);
+    this->IGTLImageMessage->AllocateScalars();
+    this->IGTLImageMessage->SetMatrix(this->IGTLImageMatrix);
+}
+
+void svlOpenIGTLinkImageServer::InitializeIGTServerSocket(int port)
+{
+    this->ServerSocket = igtl::ServerSocket::New();
+    int r = this->ServerSocket->CreateServer(port);
+    if (r < 0)
+    {
+        std::cerr << "Cannot create a server socket." << std::endl;
+        exit(0);
+    }
+}
+
+
 svlOpenIGTLinkBridge::svlOpenIGTLinkBridge() :
   svlFilterBase()                                                       // Call baseclass' constructor
 {                                                                         //
@@ -17,6 +70,11 @@ svlOpenIGTLinkBridge::svlOpenIGTLinkBridge() :
 
 int svlOpenIGTLinkBridge::Initialize(svlSample* syncInput, svlSample* &syncOutput)
 {
+
+    IGTLImageServer = new svlOpenIGTLinkImageServer();
+    IGTLImageServer->InitializeIGTLData();
+    IGTLImageServer->InitializeIGTServerSocket(18955);
+
     IGTOutputLeft = igtl::ImageMessage::New();
     IGTOutputRight = igtl::ImageMessage::New();
     IGTServerSocket = igtl::ServerSocket::New();
