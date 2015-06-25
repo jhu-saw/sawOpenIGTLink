@@ -25,13 +25,8 @@ public:
     svlOpenIGTLinkBridge();
 
     svlOpenIGTLinkImageServer* IGTLImageServer;
-
-    igtl::ImageMessage::Pointer IGTOutputLeft;
-    igtl::ImageMessage::Pointer IGTOutputRight;
-    igtl::ServerSocket::Pointer IGTServerSocket;
-    igtl::Socket::Pointer socket;       // std::list sockets
     int NumberOfClients;
-    igtl::Matrix4x4 IGTLMatrix;
+    int SendIGTLImageMessages(svlOpenIGTLinkImageServer* server, svlSample *syncInput);
 
 protected:
     int Initialize(svlSample* syncInput, svlSample* &syncOutput);
