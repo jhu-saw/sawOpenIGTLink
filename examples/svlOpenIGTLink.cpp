@@ -55,27 +55,52 @@ void svlOpenIGTLinkImageServer::InitializeIGTServerSocket(int port)
         std::cerr << "Cannot create a server socket." << std::endl;
         exit(0);
     }
+    this->Port = port;
 }
 
 
 svlOpenIGTLinkBridge::svlOpenIGTLinkBridge() :
   svlFilterBase()                                                       // Call baseclass' constructor
-{                                                                         //
+{                                                                       //
   AddInput("input", true);                                              // Create synchronous input connector
   AddInputType("input", svlTypeImageRGB);                               // Set sample type for input connector
                                                                         //
   AddOutput("output", true);                                            // Create synchronous ouput connector
   SetAutomaticOutputType(true);                                         // Set output sample type the same as input sample type
+
+  this->Port = -1;
 }
+
+int svlOpenIGTLinkBridge::SetDeviceName(std::string name)
+{
+    DeviceName = name;
+    return 1;
+}
+
+std::string svlOpenIGTLinkBridge::GetDeviceName()
+{
+    return this->IGTLImageServer->DeviceName;
+}
+
+int svlOpenIGTLinkBridge::SetPortNumber(int port)
+{
+    if(this->Port == -1)
+    {
+        this->Port = port;
+        return 1;
+    }
+    return 0;
+}
+
 
 int svlOpenIGTLinkBridge::Initialize(svlSample* syncInput, svlSample* &syncOutput)
 {
     IGTLImageServer = new svlOpenIGTLinkImageServer();
     IGTLImageServer->InitializeIGTLData();
-    IGTLImageServer->InitializeIGTServerSocket(18944);
+    IGTLImageServer->DeviceName = this->DeviceName;
+    IGTLImageServer->Port = -1;
 
     syncOutput = syncInput;                                              // Pass the input sample forward to the output
-    NumberOfClients = 0;
     return SVL_OK;                                                        //
 }
 
@@ -134,17 +159,19 @@ int svlOpenIGTLinkBridge::SendIGTLImageMessages(svlOpenIGTLinkImageServer* serve
             for (removedIter = toBeRemoved.begin();
                  removedIter != removedEnd;
                  ++removedIter) {
-                CMN_LOG_CLASS_RUN_VERBOSE << "Removing client socket for bridge \""
+                std::cerr << "Removing client socket for bridge \""
                                           << server->DeviceName << "\"" << std::endl;
                 server->Sockets.erase(*removedIter);
             }
         }
         else
         {
+            /*
             std::cerr<<"Currently there are no clients avaiable for server [ "
                      << IGTLImageServer->DeviceName
                      <<" ] "
                      << std::endl;
+                     */
             return SVL_FAIL;
         }
     }
@@ -159,26 +186,42 @@ int svlOpenIGTLinkBridge::Process(svlProcInfo* procInfo, svlSample* syncInput, s
 {
     _OnSingleThread(procInfo)                                               // Execute the following block on one thread only
     {
-
-        igtl::Socket::Pointer newSocket;
-
-        // First check if there are new clients
-        newSocket = IGTLImageServer->ServerSocket->WaitForConnection(5);
-        if (newSocket.IsNotNull()) {
-            // log some information and add to list
-            std::string address;
-            int port;
-            newSocket->GetSocketAddressAndPort(address, port);
-            std::cerr << "Found new client for svlOpenIGTLinkBridge \""
-                                      << IGTLImageServer->DeviceName << " from "
-                                      << address << ":" << port << std::endl;
-            // set socket time out
-            newSocket->SetReceiveTimeout(10);
-            // add new socket to the list
-            IGTLImageServer->Sockets.push_back(newSocket);
+        if(IGTLImageServer->DeviceName.empty() || IGTLImageServer->DeviceName!=DeviceName)
+        {
+            IGTLImageServer->DeviceName = DeviceName;
         }
 
-        SendIGTLImageMessages(IGTLImageServer,syncInput);
+        if(IGTLImageServer->Port!=-1)
+        {
+            igtl::Socket::Pointer newSocket;
+
+            // First check if there are new clients
+            newSocket = IGTLImageServer->ServerSocket->WaitForConnection(5);
+            if (newSocket.IsNotNull()) {
+                // log some information and add to list
+                std::string address;
+                int port;
+                newSocket->GetSocketAddressAndPort(address, port);
+                std::cerr << "Found new client for svlOpenIGTLinkBridge \""
+                                          << IGTLImageServer->DeviceName << " from "
+                                          << address << ":" << port << std::endl;
+                // set socket time out
+                newSocket->SetReceiveTimeout(10);
+                // add new socket to the list
+                IGTLImageServer->Sockets.push_back(newSocket);
+            }
+
+            SendIGTLImageMessages(IGTLImageServer,syncInput);
+        }
+        else{
+            if(this->Port!=-1 && this->IGTLImageServer->Port==-1 )
+            {
+                std::cerr<<"Asign port number, namely: "
+                       << this->Port
+                       <<std::endl;
+                IGTLImageServer->InitializeIGTServerSocket(Port);
+            }
+        }
     }
     syncOutput = syncInput;
     return SVL_OK;

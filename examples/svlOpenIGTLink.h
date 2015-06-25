@@ -23,9 +23,14 @@ class svlOpenIGTLinkBridge : public svlFilterBase
 {
 public:
     svlOpenIGTLinkBridge();
+    int SetPortNumber(int port);
+    int GetPortNumber();
+    int SetDeviceName(std::string name);
+    std::string GetDeviceName();
 
     svlOpenIGTLinkImageServer* IGTLImageServer;
-    int NumberOfClients;
+    std::string DeviceName;
+    int Port;
     int SendIGTLImageMessages(svlOpenIGTLinkImageServer* server, svlSample *syncInput);
 
 protected:

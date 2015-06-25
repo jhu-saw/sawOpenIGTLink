@@ -106,8 +106,6 @@ int CameraViewer(bool interpolation, bool save, int width, int height)
 #endif // _USE_QT_ && CISST_HAS_OPENGL
     svlFilterImageOverlay overlay;
     CViewerEventHandler window_eh;
-    svlOpenIGTLinkBridge OpenIGTlinkFilter;
-
 
     // setup source
     // Delete "device.dat" to reinitialize input device
@@ -151,8 +149,13 @@ int CameraViewer(bool interpolation, bool save, int width, int height)
 
     svlFilterImageChannelSwapper rgb_swapper;
     output->Connect(rgb_swapper.GetInput());
-        output = rgb_swapper.GetOutput();
+    output = rgb_swapper.GetOutput();
 
+
+
+    svlOpenIGTLinkBridge OpenIGTlinkFilter;
+    OpenIGTlinkFilter.SetPortNumber(18946);
+    OpenIGTlinkFilter.SetDeviceName("OpenIGTLink Conversion Filter");
     output->Connect(OpenIGTlinkFilter.GetInput());
     output = OpenIGTlinkFilter.GetOutput();
 
