@@ -88,7 +88,7 @@ public:
 //  CameraViewer  //
 ////////////////////
 
-int CameraViewer(bool interpolation, bool save, int width, int height)
+int CameraViewer(bool interpolation, bool save, int width, int height, char* port)
 {
 
     svlInitialize();
@@ -140,27 +140,32 @@ int CameraViewer(bool interpolation, bool save, int width, int height)
     svlFilterOutput *output;
 
     // Add source
+    svlFilterSplitter Splitter;
     stream.SetSourceFilter(&source);
     //source.GetOutput()->Connect(OpenIGTlinkFilter.GetInput());
     //output = OpenIGTlinkFilter.GetOutput();
 
-    output = source.GetOutput();
+    Splitter.AddOutput("async_out");
+    source.GetOutput()->Connect(Splitter.GetInput());
+
 
 
     svlFilterImageChannelSwapper rgb_swapper;
-    output->Connect(rgb_swapper.GetInput());
-    output = rgb_swapper.GetOutput();
+    Splitter.GetOutput()->Connect(rgb_swapper.GetInput());
 
+    //output = Splitter.GetOutput();
 
 
     svlOpenIGTLinkBridge OpenIGTlinkFilter;
-    OpenIGTlinkFilter.SetPortNumber(18946);
+    int inputPort = atoi(port);
+    std::cerr<<inputPort<<std::endl;
+    OpenIGTlinkFilter.SetPortNumber(inputPort);
     OpenIGTlinkFilter.SetDeviceName("OpenIGTLink Conversion Filter");
-    output->Connect(OpenIGTlinkFilter.GetInput());
-    output = OpenIGTlinkFilter.GetOutput();
+    rgb_swapper.GetOutput()->Connect(OpenIGTlinkFilter.GetInput());
+    //output = OpenIGTlinkFilter.GetOutput();
 
     // Add window
-    output->Connect(window.GetInput());
+    Splitter.GetOutput("async_out")->Connect(window.GetInput());
         output = window.GetOutput();
 
     cerr << "Starting stream... ";
@@ -212,8 +217,12 @@ int my_main(int argc, char** argv)
 
     //////////////////////////////
     // starting viewer
-
-    CameraViewer(interpolation, save, width, height);
+    if(argc > 1){
+        CameraViewer(interpolation, save, width, height, argv[1]);
+    }
+    else{
+        std::cerr<<"Enter desired port number, eg ./sawOpenIGTLinkSvlExample 18944" << std::endl;
+    }
 
     cerr << "Quit" << endl;
     return 1;
