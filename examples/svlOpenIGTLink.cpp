@@ -29,13 +29,13 @@ public:
     SocketsType                                 Sockets;
     bool                                        MessageInitialized;
 
-    void InitializeIGTLData(svlSample *inputImage);
+    int InitializeIGTLData(svlSample *inputImage);
     void InitializeIGTServerSocket(int port);
 };
 
-void svlOpenIGTLinkImageServer::InitializeIGTLData(svlSample* inputImage)
+int svlOpenIGTLinkImageServer::InitializeIGTLData(svlSample* inputImage)
 {
-    const svlSampleImageRGB* image = (svlSampleImageRGB*)(inputImage);
+    const svlSampleImage* image = (svlSampleImage*)(inputImage);
 
     this->IGTLImageMessage = igtl::ImageMessage::New();
     this->IGTLImageMessage->SetDeviceName(this->DeviceName.c_str());
@@ -49,11 +49,19 @@ void svlOpenIGTLinkImageServer::InitializeIGTLData(svlSample* inputImage)
     this->IGTLImageMatrix[0][2] = 0.0;   this->IGTLImageMatrix[1][2] = 0.0;  this->IGTLImageMatrix[2][2] = 1.0; this->IGTLImageMatrix[3][2] = 0.0;
     this->IGTLImageMatrix[0][3] = 0.0;   this->IGTLImageMatrix[1][3] = 0.0;  this->IGTLImageMatrix[2][3] = 0.0; this->IGTLImageMatrix[3][3] = 1.0;
 
-
     int subOffset[3]={0};
     int imageSizePixels[3]={    image->GetWidth(),
                                 image->GetHeight(),
                                 image->GetVideoChannels() };
+
+    if(image->GetVideoChannels()==2)
+    {
+        if(image->GetWidth(SVL_LEFT) !=image->GetWidth(SVL_RIGHT) || image->GetHeight(SVL_LEFT) !=image->GetHeight(SVL_RIGHT) )
+        {
+            std::cerr<<"Stereo images are not equal size"<<std::endl;
+            return SVL_FAIL;
+        }
+    }
 
     std::cerr<< "Input image width: " <<
                 imageSizePixels[0] <<
@@ -95,12 +103,19 @@ void svlOpenIGTLinkImageServer::InitializeIGTLData(svlSample* inputImage)
         this->IGTLImageMessage->SetScalarType(igtl::ImageMessage::TYPE_FLOAT32);
         this->IGTLImageMessage->SetNumComponents(3);
     }
+    else
+    {
+        std::cerr<<"Image type not supported"<<std::endl;
+        return SVL_FAIL;
+    }
 
     this->IGTLImageMessage->SetDimensions(imageSizePixels);
     this->IGTLImageMessage->SetSubVolume(imageSizePixels, subOffset);
     this->IGTLImageMessage->SetMatrix(this->IGTLImageMatrix);
     this->IGTLImageMessage->AllocateScalars();
     this->MessageInitialized = true;
+
+    return SVL_OK;
 }
 
 void svlOpenIGTLinkImageServer::InitializeIGTServerSocket(int port)
@@ -120,8 +135,18 @@ svlOpenIGTLinkBridge::svlOpenIGTLinkBridge() :
   svlFilterBase()                                                       // Call baseclass' constructor
 {                                                                       //
   AddInput("input", true);                                              // Create synchronous input connector
+  AddInputType("input", svlTypeImageRGBStereo);                         // Set sample type for input connector
   AddInputType("input", svlTypeImageRGB);                               // Set sample type for input connector
-                                                                        //
+  AddInputType("input", svlTypeImageRGBA);                         // Set sample type for input connector
+  AddInputType("input", svlTypeImageRGBAStereo);                               // Set sample type for input connector
+  AddInputType("input", svlTypeImageMono8);                         // Set sample type for input connector
+  AddInputType("input", svlTypeImageMono8Stereo);                               // Set sample type for input connector
+  AddInputType("input", svlTypeImageMono16);                         // Set sample type for input connector
+  AddInputType("input", svlTypeImageMono16Stereo);                               // Set sample type for input connector
+  AddInputType("input", svlTypeImageMono32);                         // Set sample type for input connector
+  AddInputType("input", svlTypeImageMono32Stereo);                               // Set sample type for input connector
+  AddInputType("input", svlTypeImage3DMap);                               // Set sample type for input connector
+
   AddOutput("output", true);                                            // Create synchronous ouput connector
   SetAutomaticOutputType(true);                                         // Set output sample type the same as input sample type
 
@@ -154,12 +179,13 @@ int svlOpenIGTLinkBridge::SetPortNumber(int port)
 int svlOpenIGTLinkBridge::Initialize(svlSample* syncInput, svlSample* &syncOutput)
 {
     this->IGTLImageServer = new svlOpenIGTLinkImageServer();
-    this->IGTLImageServer->MessageInitialized = 0;
+    this->IGTLImageServer->MessageInitialized = false;
     this->IGTLImageServer->DeviceName = this->DeviceName;
+    int success = this->IGTLImageServer->InitializeIGTLData(syncInput);
     this->IGTLImageServer->Port = -1;
 
     syncOutput = syncInput;                                              // Pass the input sample forward to the output
-    return SVL_OK;                                                        //
+    return success;                                                        //
 }
 
 int svlOpenIGTLinkBridge::SendIGTLImageMessages(svlSample* syncInput)
@@ -173,10 +199,19 @@ int svlOpenIGTLinkBridge::SendIGTLImageMessages(svlSample* syncInput)
             igtl::TimeStamp::Pointer igtlImageTimestamp = igtl::TimeStamp::New();
             igtlImageTimestamp->SetTime(timeStamp);
 
-            const svlSampleImageRGB* image = (svlSampleImageRGB*)(syncInput);
-            memcpy(this->IGTLImageServer->IGTLImageMessage->GetScalarPointer(),
-                   image->GetUCharPointer(SVL_LEFT),
-                   this->IGTLImageServer->IGTLImageMessage->GetImageSize());
+            const svlSampleImage * image = dynamic_cast<const svlSampleImage *>(syncInput);
+            CMN_ASSERT(image);
+
+            unsigned char* destination = (unsigned char*)(this->IGTLImageServer->IGTLImageMessage->GetScalarPointer());
+
+            int imageSizeAtChannel = this->IGTLImageServer->IGTLImageMessage->GetImageSize() / image->GetVideoChannels();
+
+            for(int channel =0; channel < image->GetVideoChannels(); channel++  )
+            {
+                memcpy(destination + imageSizeAtChannel * channel,
+                       image->GetUCharPointer(channel),
+                       imageSizeAtChannel);
+            }
 
             this->IGTLImageServer->IGTLImageMessage->SetMatrix(this->IGTLImageServer->IGTLImageMatrix);
             this->IGTLImageServer->IGTLImageMessage->SetTimeStamp(igtlImageTimestamp);
@@ -238,11 +273,6 @@ int svlOpenIGTLinkBridge::Process(svlProcInfo* procInfo, svlSample* syncInput, s
         if(this->IGTLImageServer->DeviceName!=this->DeviceName)
         {
             this->IGTLImageServer->DeviceName = this->DeviceName;
-        }
-
-        if(!this->IGTLImageServer->MessageInitialized)
-        {
-            this->IGTLImageServer->InitializeIGTLData(syncInput);
         }
 
         if(this->IGTLImageServer->Port!=-1)

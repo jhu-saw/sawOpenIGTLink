@@ -95,7 +95,7 @@ int CameraViewer(bool interpolation, bool save, int width, int height, char* por
 
     // instantiating SVL stream and filters
     svlStreamManager stream(8);
-    svlFilterSourceVideoCapture source(1);
+    svlFilterSourceVideoCapture source(2);
     svlFilterImageResizer resizer;
 
 
@@ -111,7 +111,8 @@ int CameraViewer(bool interpolation, bool save, int width, int height, char* por
     // Delete "device.dat" to reinitialize input device
     if (source.LoadSettings("device.dat") != SVL_OK) {
         cout << endl;
-        source.DialogSetup();
+        source.DialogSetup(SVL_LEFT);
+        source.DialogSetup(SVL_RIGHT);
     }
 
     // setup resizer
