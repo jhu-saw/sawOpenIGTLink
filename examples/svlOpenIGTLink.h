@@ -12,6 +12,8 @@ class svlOpenIGTLinkBridge : public svlFilterBase
 {
 public:
     svlOpenIGTLinkBridge();
+    virtual ~svlOpenIGTLinkBridge();
+
     int SetPortNumber(int port);
     int GetPortNumber();
     int SetDeviceName(std::string name);

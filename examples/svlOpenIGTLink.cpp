@@ -33,6 +33,7 @@ public:
     void InitializeIGTServerSocket(int port);
 };
 
+
 int svlOpenIGTLinkImageServer::InitializeIGTLData(svlSample* inputImage)
 {
     const svlSampleImage* image = (svlSampleImage*)(inputImage);
@@ -132,26 +133,35 @@ void svlOpenIGTLinkImageServer::InitializeIGTServerSocket(int port)
 
 
 svlOpenIGTLinkBridge::svlOpenIGTLinkBridge() :
-  svlFilterBase()                                                       // Call baseclass' constructor
-{                                                                       //
-  AddInput("input", true);                                              // Create synchronous input connector
-  AddInputType("input", svlTypeImageRGBStereo);                         // Set sample type for input connector
-  AddInputType("input", svlTypeImageRGB);                               // Set sample type for input connector
-  AddInputType("input", svlTypeImageRGBA);                         // Set sample type for input connector
-  AddInputType("input", svlTypeImageRGBAStereo);                               // Set sample type for input connector
-  AddInputType("input", svlTypeImageMono8);                         // Set sample type for input connector
-  AddInputType("input", svlTypeImageMono8Stereo);                               // Set sample type for input connector
-  AddInputType("input", svlTypeImageMono16);                         // Set sample type for input connector
-  AddInputType("input", svlTypeImageMono16Stereo);                               // Set sample type for input connector
-  AddInputType("input", svlTypeImageMono32);                         // Set sample type for input connector
-  AddInputType("input", svlTypeImageMono32Stereo);                               // Set sample type for input connector
-  AddInputType("input", svlTypeImage3DMap);                               // Set sample type for input connector
+    svlFilterBase()                                                       // Call baseclass' constructor
+{
+    this->IGTLImageServer=0;
+    AddInput("input", true);                                              // Create synchronous input connector
+    AddInputType("input", svlTypeImageRGBStereo);                         // Set sample type for input connector
+    AddInputType("input", svlTypeImageRGB);                               // Set sample type for input connector
+    AddInputType("input", svlTypeImageRGBA);                         // Set sample type for input connector
+    AddInputType("input", svlTypeImageRGBAStereo);                               // Set sample type for input connector
+    AddInputType("input", svlTypeImageMono8);                         // Set sample type for input connector
+    AddInputType("input", svlTypeImageMono8Stereo);                               // Set sample type for input connector
+    AddInputType("input", svlTypeImageMono16);                         // Set sample type for input connector
+    AddInputType("input", svlTypeImageMono16Stereo);                               // Set sample type for input connector
+    AddInputType("input", svlTypeImageMono32);                         // Set sample type for input connector
+    AddInputType("input", svlTypeImageMono32Stereo);                               // Set sample type for input connector
+    AddInputType("input", svlTypeImage3DMap);                               // Set sample type for input connector
 
-  AddOutput("output", true);                                            // Create synchronous ouput connector
-  SetAutomaticOutputType(true);                                         // Set output sample type the same as input sample type
+    AddOutput("output", true);                                            // Create synchronous ouput connector
+    SetAutomaticOutputType(true);                                         // Set output sample type the same as input sample type
 
-  this->Port = -1;
-  this->DeviceName= "svlOpenIGTLinkBridge";
+    this->Port = -1;
+    this->DeviceName= "svlOpenIGTLinkBridge";
+}
+
+svlOpenIGTLinkBridge::~svlOpenIGTLinkBridge()
+{
+    if(IGTLImageServer)
+    {
+        delete IGTLImageServer;
+    }
 }
 
 int svlOpenIGTLinkBridge::SetDeviceName(std::string name)
@@ -206,7 +216,7 @@ int svlOpenIGTLinkBridge::SendIGTLImageMessages(svlSample* syncInput)
 
             int imageSizeAtChannel = this->IGTLImageServer->IGTLImageMessage->GetImageSize() / image->GetVideoChannels();
 
-            for(int channel =0; channel < image->GetVideoChannels(); channel++  )
+            for(unsigned int channel =0; channel < image->GetVideoChannels(); channel++  )
             {
                 memcpy(destination + imageSizeAtChannel * channel,
                        image->GetUCharPointer(channel),
@@ -250,7 +260,7 @@ int svlOpenIGTLinkBridge::SendIGTLImageMessages(svlSample* syncInput)
                  removedIter != removedEnd;
                  ++removedIter) {
                 std::cerr << "Removing client socket for bridge \""
-                                          << this->IGTLImageServer->DeviceName << "\"" << std::endl;
+                          << this->IGTLImageServer->DeviceName << "\"" << std::endl;
                 this->IGTLImageServer->Sockets.erase(*removedIter);
             }
         }
