@@ -6,17 +6,6 @@
 #include <cisstStereoVision/svlFilterBase.h>
 #include <cisstStereoVision/svlDefinitions.h>
 
-#include <igtl/igtlOSUtil.h>
-#include <igtl/igtlTransformMessage.h>
-#include <igtl/igtlServerSocket.h>
-#include <igtl/igtlImageMessage.h>
-#include <igtl/igtlMessageBase.h>
-#include <igtl/igtlSocket.h>
-#include <igtl/igtlImageMetaMessage.h>
-#include <igtl/igtlTransformMessage.h>
-#include <igtl/igtlPositionMessage.h>
-#include <igtl/igtl_util.h>
-
 class svlOpenIGTLinkImageServer;
 
 class svlOpenIGTLinkBridge : public svlFilterBase
@@ -31,7 +20,7 @@ public:
     svlOpenIGTLinkImageServer* IGTLImageServer;
     std::string DeviceName;
     int Port;
-    int SendIGTLImageMessages(svlOpenIGTLinkImageServer* server, svlSample *syncInput);
+    int SendIGTLImageMessages(svlSample *syncInput);
 
 protected:
     int Initialize(svlSample* syncInput, svlSample* &syncOutput);
