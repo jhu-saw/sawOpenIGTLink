@@ -2,10 +2,10 @@
 /* ex: set filetype=cpp softtabstop=4 shiftwidth=4 tabstop=4 cindent expandtab: */
 
 /*
-  Author(s):  Ali Uneri
-  Created on: 2009-08-10
+  Author(s):  Youri Tan, Anton Deguet
+  Created on: 2015-07-24
 
-  (C) Copyright 2009-2012 Johns Hopkins University (JHU), All Rights Reserved.
+  (C) Copyright 2009-2015 Johns Hopkins University (JHU), All Rights Reserved.
 
 --- begin cisst license - do not edit ---
 
@@ -37,6 +37,8 @@ class mtsOpenIGTLinkBridgeData {
 public:
     int Port;
     std::string Name;
+    std::string ComponentName;
+    std::string ProvidedInterfaceName;
 
     igtl::ServerSocket::Pointer ServerSocket;
     igtl::TransformMessage::Pointer TransformMessage;
@@ -91,14 +93,73 @@ void mtsOpenIGTLinkBridge::Cleanup(void)
     }
 }
 
+void mtsOpenIGTLinkBridge::Configure(const std::string & jsonFile)
+{
+    std::ifstream jsonStream;
+    jsonStream.open(jsonFile.c_str());
+
+    Json::Value jsonConfig, jsonValue;
+    Json::Reader jsonReader;
+    if (!jsonReader.parse(jsonStream, jsonConfig)) {
+        CMN_LOG_CLASS_INIT_ERROR << "Configure: failed to parse configuration\n"
+                                 << jsonReader.getFormattedErrorMessages();
+        return;
+    }
+
+    const Json::Value arms = jsonConfig["arms"];
+    for (unsigned int index = 0; index < arms.size(); ++index) {
+        if (!ConfigureArmServers(arms[index])) {
+            CMN_LOG_CLASS_INIT_ERROR << "Configure: failed to configure arms[" << index << "]" << std::endl;
+            return;
+        }
+    }
+}
+
+bool mtsOpenIGTLinkBridge::ConfigureArmServers(const Json::Value &jsonArm)
+{
+    std::string armName = jsonArm["name"].asString();
+    std::string armComponent = jsonArm["component"].asString();
+    std::string armProvided = jsonArm["provided-interface"].asString();
+    int armPort = jsonArm["port-number"].asInt();
+    std::cerr << "mtsOpenIGTLink bridge: Adding arm \"" << armName
+              << "\", on port number \"" << armPort
+              << "\"" << std::endl;
+
+    if(!(this->AddServerFromCommandRead(armPort, armName, armName,armComponent, armProvided)))
+    {
+         return false;
+    }
+    return true;
+}
+
+bool mtsOpenIGTLinkBridge::Connect(void)
+{
+
+    mtsManagerLocal * componentManager = mtsManagerLocal::GetInstance();
+
+    const BridgesType::iterator endBridges = Bridges.end();
+    BridgesType::iterator bridgeIter;
+    for (bridgeIter = Bridges.begin();
+         bridgeIter != endBridges;
+         ++bridgeIter) {
+        mtsOpenIGTLinkBridgeData * bridge = *bridgeIter;
+            componentManager->Connect(this->Name, bridge->Name, bridge->ComponentName, bridge->ProvidedInterfaceName);
+    }
+    return true;
+}
+
 
 bool mtsOpenIGTLinkBridge::AddServerFromCommandRead(const int port, const std::string & igtlFrameName,
                                                     const std::string & interfaceRequiredName,
+                                                    const std::string & componentName,
+                                                    const std::string & providedName,
                                                     const std::string & commandName)
 {
     mtsOpenIGTLinkBridgeData * bridge = new mtsOpenIGTLinkBridgeData;
     bridge->Port = port;
     bridge->Name = igtlFrameName;
+    bridge->ComponentName = componentName;
+    bridge->ProvidedInterfaceName = providedName;
     bridge->ServerSocket = igtl::ServerSocket::New();
     bool newInterface;
 
@@ -211,7 +272,7 @@ void mtsOpenIGTLinkBridge::ServerSend(mtsOpenIGTLinkBridgeData * bridge)
     if (!bridge->Sockets.empty()) {
         mtsExecutionResult result;
         result = bridge->ReadFunction(bridge->PositionCartesianGet);
-        std::cout<<bridge->PositionCartesianGet.Valid()<<std::endl;
+        //std::cout<<bridge->PositionCartesianGet.Valid()<<std::endl;
         if (result.IsOK()) {
             dataNeedsSend = bridge->PositionCartesianGet.Valid();
         } else {
@@ -239,8 +300,8 @@ void mtsOpenIGTLinkBridge::ServerSend(mtsOpenIGTLinkBridgeData * bridge)
             int receivingClientActive =
                 socket->Send(bridge->TransformMessage->GetPackPointer(),
                              bridge->TransformMessage->GetPackSize());
-            std::cerr<<"Server trying to send data: " <<
-                       receivingClientActive << std::endl;
+            //std::cerr<<"Server trying to send data: " <<
+            //           receivingClientActive << std::endl;
             // remove the client if we can't send
             if (receivingClientActive == 0) {
                 // log some information and remove from list
@@ -295,7 +356,7 @@ void mtsOpenIGTLinkBridge::ServerReceive(mtsOpenIGTLinkBridgeData * bridge){
             int sendingClientActive =
                 socket->Receive(headerMsg->GetPackPointer(),
                              headerMsg->GetPackSize());
-            std::cerr<<"Server trying to receive data: " << sendingClientActive << std::endl;
+           // std::cerr<<"Server trying to receive data: " << sendingClientActive << std::endl;
 /*
             if (sendingClientActive != headerMsg->GetPackSize()){
                 continue;
@@ -309,7 +370,7 @@ void mtsOpenIGTLinkBridge::ServerReceive(mtsOpenIGTLinkBridgeData * bridge){
 
                 if (bridge->PositionCartesianSet.Valid()) {
                     // bridge->WriteFunction(bridge->PositionCartesianGet);
-                    std::cerr<<"Recievd valid transform"<<std::endl;
+                    //std::cerr<<"Recievd valid transform"<<std::endl;
                 }
             }
             // remove the client if we can't receive
@@ -431,7 +492,7 @@ void mtsOpenIGTLinkBridgeData::ProcessIncomingMessage(mtsOpenIGTLinkBridgeData *
                                                       igtl::MessageHeader::Pointer headerMsg){
 
     if(strcmp(headerMsg->GetDeviceType(), "TRANSFORM") == 0){
-        std::cout<<"Server received transform message"<<std::endl;
+        //std::cout<<"Server received transform message"<<std::endl;
         bridge->TransformMessage->SetMessageHeader(headerMsg);
         bridge->TransformMessage->AllocatePack();
 

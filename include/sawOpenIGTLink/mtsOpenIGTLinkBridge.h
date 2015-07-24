@@ -70,13 +70,19 @@ class CISST_EXPORT mtsOpenIGTLinkBridge: public mtsTaskPeriodic
     /*! Destructor */
     inline ~mtsOpenIGTLinkBridge(void) {}
 
-    inline void Configure(const std::string & CMN_UNUSED(s)) {};
+    void Configure(const std::string & jsonFile);
     inline void Startup(void) {};
     void Run(void);
     void Cleanup(void);
 
+    bool ConfigureArmServers(const Json::Value & jsonArm);
+
+    bool Connect(void);
+
     bool AddServerFromCommandRead(const int port, const std::string & igtlFrameName,
                                   const std::string & interfaceRequiredName,
+                                  const std::string &componentName,
+                                  const std::string &providedName,
                                   const std::string & commandName = "GetPositionCartesian");
 
     bool AddServerFromCommandWrite(const int port, const std::string & igtlFrameName,
