@@ -117,12 +117,31 @@ int CameraViewer(bool interpolation, bool save, int width, int height, char* por
 
     // setup resizer
     if (width > 0 && height > 0) {
-        resizer.SetInterpolation(interpolation);
-        resizer.SetOutputSize(width, height);
+            resizer.SetInterpolation(false);
+		    resizer.SetOutputSize(width, height, SVL_LEFT);
+			resizer.SetOutputSize(width, height, SVL_RIGHT);
     }
     window.SetEventHandler(&window_eh);
     window.SetTitle("Camera Viewer");
 
+    int fullscreen = 1;
+
+/*
+    if (fullscreen >= 0) {
+		window.SetFullScreen(true);
+		if (fullscreen == 0) {
+			window.SetPosition(offsetx, 0, SVL_LEFT);
+			window.SetPosition(offsetx, height / 2, SVL_RIGHT);
+		}
+		else if (fullscreen == 1) {
+			window.SetPosition(offsetx, 0, SVL_LEFT);
+			window.SetPosition(offsetx + width / 2, 0, SVL_RIGHT);
+		}
+		else if (fullscreen == 2) {
+			window.SetPosition(offsetx, 0);
+		}
+	}
+*/
 
 
     // Add framerate overlay
@@ -163,10 +182,26 @@ int CameraViewer(bool interpolation, bool save, int width, int height, char* por
     OpenIGTlinkFilter.SetPortNumber(inputPort);
     OpenIGTlinkFilter.SetDeviceName("OpenIGTLink Conversion Filter");
     rgb_swapper.GetOutput()->Connect(OpenIGTlinkFilter.GetInput());
-    //output = OpenIGTlinkFilter.GetOutput();
+    
+
+    output = Splitter.GetOutput("async_out");//OpenIGTlinkFilter.GetOutput();
 
     // Add window
-    Splitter.GetOutput("async_out")->Connect(window.GetInput());
+    // Add shifter if fullscreen
+    /*
+	if (fullscreen >= 0) {
+        output->Connect(shifter.GetInput());
+            output = shifter.GetOutput();
+	}
+    */
+
+    // Add resizer if required
+    if (width > 0 && height > 0) {
+        output->Connect(resizer.GetInput());
+            output = resizer.GetOutput();
+    }
+
+    output->Connect(window.GetInput());
         output = window.GetOutput();
 
     cerr << "Starting stream... ";
@@ -213,8 +248,8 @@ int my_main(int argc, char** argv)
 {
     bool interpolation = false;
     bool save = false;
-    int  width = -1;
-    int  height = -1;
+    int  width = 1680;
+    int  height = 1050;
 
     //////////////////////////////
     // starting viewer
