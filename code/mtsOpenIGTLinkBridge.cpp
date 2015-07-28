@@ -461,9 +461,10 @@ void mtsOpenIGTLinkBridgeData::CISSTToIGT(const prmPositionCartesianGet & frameC
     frameIGTL[2][2] = frameCISST.Position().Rotation().Element(2,2);
     frameIGTL[3][2] = 0;
 
-    frameIGTL[0][3] = frameCISST.Position().Translation().Element(0);
-    frameIGTL[1][3] = frameCISST.Position().Translation().Element(1);
-    frameIGTL[2][3] = frameCISST.Position().Translation().Element(2);
+    // meter to mm conversion
+    frameIGTL[0][3] = frameCISST.Position().Translation().Element(0)*1000;
+    frameIGTL[1][3] = frameCISST.Position().Translation().Element(1)*1000;
+    frameIGTL[2][3] = frameCISST.Position().Translation().Element(2)*1000;
     frameIGTL[3][3] = 1;
 }
 
