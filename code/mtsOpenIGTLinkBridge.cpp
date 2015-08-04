@@ -305,7 +305,7 @@ void mtsOpenIGTLinkBridge::ServerSend(mtsOpenIGTLinkBridgeData * bridge)
             //std::cerr<<"Server trying to send data: " <<
             //           receivingClientActive << std::endl;
             // remove the client if we can't send
-            if (receivingClientActive == 0 || receivingClientActive == -1) {
+            if (receivingClientActive == 0 /*|| receivingClientActive == -1*/) {
                 // log some information and remove from list
                 std::string address;
                 int port;

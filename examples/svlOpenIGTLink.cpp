@@ -238,9 +238,10 @@ int svlOpenIGTLinkBridge::SendIGTLImageMessages(svlSample* syncInput)
                  ++socketIter)
             {
                 igtl::Socket::Pointer socket = *socketIter;
+		socket->SetTimeout(1000);
                 int socketSuccess = socket->Send(this->IGTLImageServer->IGTLImageMessage->GetPackPointer(),
                                                  this->IGTLImageServer->IGTLImageMessage->GetPackSize());
-                if (socketSuccess==0)
+                if (socketSuccess==0 /*|| socketSuccess==-1*/)
                 {
                     // log some information and remove from list
                     std::string address;
@@ -300,7 +301,8 @@ int svlOpenIGTLinkBridge::Process(svlProcInfo* procInfo, svlSample* syncInput, s
                           << this->IGTLImageServer->DeviceName << " from "
                           << address << ":" << port << std::endl;
                 // set socket time out
-                newSocket->SetReceiveTimeout(10);
+                //newSocket->SetReceiveTimeout(10);
+		newSocket->SetTimeout(1000);
                 // add new socket to the list
                 this->IGTLImageServer->Sockets.push_back(newSocket);
             }
