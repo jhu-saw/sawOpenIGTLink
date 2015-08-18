@@ -86,7 +86,7 @@ class CISST_EXPORT mtsOpenIGTLinkBridge: public mtsTaskPeriodic
                                   const std::string & commandName = "GetPositionCartesian");
 
     bool AddServerFromCommandWrite(const int port, const std::string & igtlFrameName,
-                                   const std::string & interfaceRequiredName,
+                                   const std::string & interfaceProvidedName,
                                    const std::string & commandName = "SetPositionCartesian");
 
     void ServerSend(mtsOpenIGTLinkBridgeData * bridge);

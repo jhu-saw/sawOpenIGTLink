@@ -23,6 +23,7 @@ http://www.cisst.org/cisst/license.txt.
 
 #include <sawOpenIGTLink/mtsOpenIGTLinkBridge.h>
 #include <cisstMultiTask/mtsInterfaceRequired.h>
+#include <cisstMultiTask/mtsInterfaceProvided.h>
 #include <cisstParameterTypes/prmPositionCartesianGet.h>
 #include <cisstParameterTypes/prmPositionCartesianSet.h>
 
@@ -33,7 +34,8 @@ CMN_IMPLEMENT_SERVICES_DERIVED_ONEARG(mtsOpenIGTLinkBridge, mtsTaskPeriodic, mts
 
 
 
-class mtsOpenIGTLinkBridgeData {
+class mtsOpenIGTLinkBridgeData
+{
 public:
     int Port;
     std::string Name;
@@ -47,10 +49,13 @@ public:
     int ServerType;
 
     mtsInterfaceRequired * InterfaceRequired;
+    mtsInterfaceProvided * InterfaceProvided;
     mtsFunctionRead ReadFunction;
     mtsFunctionWrite WriteFunction;
     prmPositionCartesianGet PositionCartesianGet;
     prmPositionCartesianSet PositionCartesianSet;
+
+    mtsStateTable* mStateTable;
 
     // takes in cisst frame and outputs igtl frame
     void CISSTToIGT(const prmPositionCartesianGet & frameCISST,
@@ -149,7 +154,8 @@ bool mtsOpenIGTLinkBridge::Connect(void)
 }
 
 
-bool mtsOpenIGTLinkBridge::AddServerFromCommandRead(const int port, const std::string & igtlFrameName,
+bool mtsOpenIGTLinkBridge::AddServerFromCommandRead(const int port,
+                                                    const std::string & igtlFrameName,
                                                     const std::string & interfaceRequiredName,
                                                     const std::string & componentName,
                                                     const std::string & providedName,
@@ -161,6 +167,8 @@ bool mtsOpenIGTLinkBridge::AddServerFromCommandRead(const int port, const std::s
     bridge->ComponentName = componentName;
     bridge->ProvidedInterfaceName = providedName;
     bridge->ServerSocket = igtl::ServerSocket::New();
+    bridge->mStateTable = new mtsStateTable(500, componentName);
+
     bool newInterface;
 
     // find or create cisst/SAW interface required
@@ -208,15 +216,43 @@ bool mtsOpenIGTLinkBridge::AddServerFromCommandRead(const int port, const std::s
     return true;
 }
 
-bool mtsOpenIGTLinkBridge::AddServerFromCommandWrite(const int port, const std::string & igtlFrameName,
-                                                    const std::string & interfaceRequiredName,
-                                                    const std::string & commandName)
+bool mtsOpenIGTLinkBridge::AddServerFromCommandWrite(const int port,
+                                                     const std::string & igtlFrameName,
+                                                     const std::string & interfaceProvidedName,
+                                                     const std::string & commandName)
 {
     mtsOpenIGTLinkBridgeData * bridge = new mtsOpenIGTLinkBridgeData;
     bridge->Port = port;
     bridge->Name = igtlFrameName;
     bridge->ServerSocket = igtl::ServerSocket::New();
     bool newInterface;
+
+    bridge->InterfaceProvided = GetInterfaceProvided(interfaceProvidedName);
+    if (!bridge->InterfaceProvided) {
+        bridge->InterfaceProvided = AddInterfaceProvided(interfaceProvidedName);
+        newInterface = true;
+    } else {
+        newInterface = false;
+    }
+    if (bridge->InterfaceProvided) {
+       // add write function
+        bridge->mStateTable->AddData(bridge->PositionCartesianSet, "GetPositionCartesian");
+        if (!bridge->InterfaceProvided->AddCommandReadState(*bridge->mStateTable, bridge->PositionCartesianSet, commandName))
+        {
+             CMN_LOG_CLASS_INIT_ERROR << "AddServerFromReadWrite: can't add function \""
+                                     << commandName << "\" to interface \""
+                                     << interfaceProvidedName << "\", it probably already exists"
+                                     << std::endl;
+            delete bridge;
+            return false;
+        }
+    } else {
+        CMN_LOG_CLASS_INIT_ERROR << "AddServerFromReadWrite: can't create interface \""
+                                 << interfaceProvidedName << "\", it probably already exists"
+                                 << std::endl;
+        delete bridge;
+        return false;
+    }
 
     // find or create cisst/SAW interface required
     /*
@@ -251,7 +287,7 @@ bool mtsOpenIGTLinkBridge::AddServerFromCommandWrite(const int port, const std::
         CMN_LOG_CLASS_INIT_ERROR << "AddServerFromReadWrite: can't create server socket on port "
                                  << bridge->Port << std::endl;
         if (newInterface) {
-           this->RemoveInterfaceRequired(interfaceRequiredName);
+           this->RemoveInterfaceRequired(interfaceProvidedName);
         }
         delete bridge;
         return false;
@@ -303,7 +339,7 @@ void mtsOpenIGTLinkBridge::ServerSend(mtsOpenIGTLinkBridgeData * bridge)
             //std::cerr<<"Server trying to send data: " <<
             //           receivingClientActive << std::endl;
             // remove the client if we can't send
-            if (receivingClientActive == 0) {
+            if (receivingClientActive == 0 || receivingClientActive == -1) {
                 // log some information and remove from list
                 std::string address;
                 int port;
@@ -461,7 +497,7 @@ void mtsOpenIGTLinkBridgeData::CISSTToIGT(const prmPositionCartesianGet & frameC
     frameIGTL[2][2] = frameCISST.Position().Rotation().Element(2,2);
     frameIGTL[3][2] = 0;
 
-    // meter to mm conversion
+    // meter to mm conversion -> remove?
     frameIGTL[0][3] = frameCISST.Position().Translation().Element(0)*1000;
     frameIGTL[1][3] = frameCISST.Position().Translation().Element(1)*1000;
     frameIGTL[2][3] = frameCISST.Position().Translation().Element(2)*1000;
