@@ -332,6 +332,8 @@ void mtsOpenIGTLinkBridge::ServerSend(mtsOpenIGTLinkBridgeData * bridge)
              socketIter != endSockets;
              ++socketIter) {
             igtl::Socket::Pointer socket = *socketIter;
+            socket->SetTimeout(10);
+            socket->SetSendBlocking(10);
             // keep track of which client we can send to
             int receivingClientActive =
                 socket->Send(bridge->TransformMessage->GetPackPointer(),
@@ -339,7 +341,8 @@ void mtsOpenIGTLinkBridge::ServerSend(mtsOpenIGTLinkBridgeData * bridge)
             //std::cerr<<"Server trying to send data: " <<
             //           receivingClientActive << std::endl;
             // remove the client if we can't send
-            if (receivingClientActive == 0 || receivingClientActive == -1) {
+
+            if (receivingClientActive == 0 /*|| receivingClientActive == -1*/) {
                 // log some information and remove from list
                 std::string address;
                 int port;
@@ -463,7 +466,8 @@ void mtsOpenIGTLinkBridge::Run(void)
                                       << bridge->Name << " from "
                                       << address << ":" << port << std::endl;
             // set socket time out
-            newSocket->SetReceiveTimeout(10);
+            newSocket->SetTimeout(10);
+            newSocket->SetSendBlocking(10);
             // add new socket to the list
             bridge->Sockets.push_back(newSocket);
         }
