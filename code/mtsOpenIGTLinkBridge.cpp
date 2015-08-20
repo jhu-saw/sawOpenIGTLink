@@ -253,34 +253,6 @@ bool mtsOpenIGTLinkBridge::AddServerFromCommandWrite(const int port,
         delete bridge;
         return false;
     }
-
-    // find or create cisst/SAW interface required
-    /*
-    bridge->InterfaceRequired = GetInterfaceRequired(interfaceRequiredName);
-    if (!bridge->InterfaceRequired) {
-        bridge->InterfaceRequired = AddInterfaceRequired(interfaceRequiredName);
-        newInterface = true;
-    } else {
-        newInterface = false;
-    }
-    if (bridge->InterfaceRequired) {
-        // add write function
-        if (!bridge->InterfaceRequired->AddFunction(commandName, bridge->ReadFunction)) {
-            CMN_LOG_CLASS_INIT_ERROR << "AddServerFromReadWrite: can't add function \""
-                                     << commandName << "\" to interface \""
-                                     << interfaceRequiredName << "\", it probably already exists"
-                                     << std::endl;
-            delete bridge;
-            return false;
-        }
-    } else {
-        CMN_LOG_CLASS_INIT_ERROR << "AddServerFromReadWrite: can't create interface \""
-                                 << interfaceRequiredName << "\", it probably already exists"
-                                 << std::endl;
-        delete bridge;
-        return false;
-    }
-    */
     // create igtl server
     int result = bridge->ServerSocket->CreateServer(bridge->Port);
     if (result < 0) {
