@@ -31,12 +31,18 @@ if (cisst_FOUND_AS_REQUIRED)
     set (EXECUTABLE_OUTPUT_PATH "${CATKIN_DEVEL_PREFIX}/bin")
   endif ()
 
+  find_package (OpenIGTLink REQUIRED)
+
+  if (OpenIGTLink_FOUND)
+     # OpenIGTLink code
+    include (${OpenIGTLink_USE_FILE})    # OpenIGTLink code
+  endif(OpenIGTLink_FOUND)
 
   # sawOpenIGTLink has been compiled within cisst, we should find it automatically
   cisst_find_saw_component (sawOpenIGTLink REQUIRED)
 
   if (sawOpenIGTLink_FOUND)
-
+    
     include_directories (${sawOpenIGTLink_INCLUDE_DIR})
     link_directories (${sawOpenIGTLink_LIBRARY_DIR})
 

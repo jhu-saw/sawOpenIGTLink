@@ -17,9 +17,9 @@ http://www.cisst.org/cisst/license.txt.
 */
 
 
-#include <igtl/igtlOSUtil.h>
-#include <igtl/igtlTransformMessage.h>
-#include <igtl/igtlServerSocket.h>
+#include <igtlOSUtil.h>
+#include <igtlTransformMessage.h>
+#include <igtlServerSocket.h>
 
 #include <sawOpenIGTLink/mtsOpenIGTLinkBridge.h>
 #include <cisstMultiTask/mtsInterfaceRequired.h>

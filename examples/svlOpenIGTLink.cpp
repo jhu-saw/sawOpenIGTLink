@@ -3,16 +3,16 @@
 
 #include <cisstOSAbstraction/osaSleep.h>
 
-#include <igtl/igtlOSUtil.h>
-#include <igtl/igtlTransformMessage.h>
-#include <igtl/igtlServerSocket.h>
-#include <igtl/igtlImageMessage.h>
-#include <igtl/igtlMessageBase.h>
-#include <igtl/igtlSocket.h>
-#include <igtl/igtlImageMetaMessage.h>
-#include <igtl/igtlTransformMessage.h>
-#include <igtl/igtlPositionMessage.h>
-#include <igtl/igtl_util.h>
+// #include <igtlOSUtil.h>
+#include <igtlTransformMessage.h>
+#include <igtlServerSocket.h>
+#include <igtlImageMessage.h>
+#include <igtlMessageBase.h>
+#include <igtlSocket.h>
+#include <igtlImageMetaMessage.h>
+#include <igtlTransformMessage.h>
+#include <igtlPositionMessage.h>
+#include <igtl_util.h>
 
 #include "svlOpenIGTLink.h"
 
