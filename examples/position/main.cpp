@@ -2,7 +2,6 @@
 /* ex: set filetype=cpp softtabstop=4 shiftwidth=4 tabstop=4 cindent expandtab: */
 
 /*
-
   Author(s):  Ali Uneri
   Created on: 2009-08-11
 
@@ -24,7 +23,6 @@ http://www.cisst.org/cisst/license.txt.
 #include "trackerSimulator.h"
 
 #define IS_SERVER 0  // make this 0 to run as a client
-
 
 int main()
 {

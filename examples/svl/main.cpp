@@ -40,24 +40,7 @@ http://www.cisst.org/cisst/license.txt.
 #include <cisstStereoVision/svlFilterImageOverlay.h>
 #include <cisstStereoVision/svlFilterImageChannelSwapper.h>
 
-#include "svlOpenIGTLink.h"
-
-#if CISST_HAS_QT4
-    #include <cisstStereoVision/svlQtObjectFactory.h>
-    #include <cisstStereoVision/svlQtWidgetFileOpen.h>
-    #include <cisstStereoVision/svlQtWidgetFramerate.h>
-    #include <cisstStereoVision/svlQtWidgetVideoEncoder.h>
-    #include <cisstStereoVision/svlQtWidgetVidCapSrcImageProperties.h>
-    #if CISST_HAS_OPENGL
-        #include <cisstStereoVision/svlFilterImageWindowQt.h>
-    #endif
-    // Qt dialogs are disabled by default
-    #define _USE_QT_    0
-#endif
-
-
-using namespace std;
-
+#include <sawOpenIGTLink/svlOpenIGTLinkBridge.h>
 
 /////////////////////////////#///////////
 //     Window event handler class     //
@@ -97,29 +80,23 @@ int CameraViewer(bool interpolation, bool save, int width, int height, char* por
     svlStreamManager stream(8);
     svlFilterSourceVideoCapture source(2);
     svlFilterImageResizer resizer;
-
-
-#if _USE_QT_ && CISST_HAS_OPENGL
-    svlFilterImageWindowQt window;
-#else // _USE_QT_ && CISST_HAS_OPENGL
     svlFilterImageWindow window;
-#endif // _USE_QT_ && CISST_HAS_OPENGL
     svlFilterImageOverlay overlay;
     CViewerEventHandler window_eh;
 
     // setup source
     // Delete "device.dat" to reinitialize input device
     if (source.LoadSettings("device.dat") != SVL_OK) {
-        cout << endl;
+        std::cout << std::endl;
         source.DialogSetup(SVL_LEFT);
         source.DialogSetup(SVL_RIGHT);
     }
 
     // setup resizer
     if (width > 0 && height > 0) {
-            resizer.SetInterpolation(false);
-		    resizer.SetOutputSize(width, height, SVL_LEFT);
-			resizer.SetOutputSize(width, height, SVL_RIGHT);
+        resizer.SetInterpolation(false);
+        resizer.SetOutputSize(width, height, SVL_LEFT);
+        resizer.SetOutputSize(width, height, SVL_RIGHT);
     }
     window.SetEventHandler(&window_eh);
     window.SetTitle("Camera Viewer");
@@ -128,23 +105,6 @@ int CameraViewer(bool interpolation, bool save, int width, int height, char* por
 
     // Set to FALSE if fullscreen is not desired 
     window.SetFullScreen(true);
-/*
-    if (fullscreen >= 0) {
-		window.SetFullScreen(true);
-		if (fullscreen == 0) {
-			window.SetPosition(offsetx, 0, SVL_LEFT);
-			window.SetPosition(offsetx, height / 2, SVL_RIGHT);
-		}
-		else if (fullscreen == 1) {
-			window.SetPosition(offsetx, 0, SVL_LEFT);
-			window.SetPosition(offsetx + width / 2, 0, SVL_RIGHT);
-		}
-		else if (fullscreen == 2) {
-			window.SetPosition(offsetx, 0);
-		}
-	}
-*/
-
 
     // Add framerate overlay
     svlOverlayFramerate fps_overlay(SVL_LEFT,
@@ -156,7 +116,7 @@ int CameraViewer(bool interpolation, bool save, int width, int height, char* por
                                     svlRGB(128, 0, 0));
     overlay.AddOverlay(fps_overlay);
 
-    cerr << "Assembling stream..." << endl;
+    std::cout << "Assembling stream..." << std::endl;
 
     // chain filters to pipeline
     svlFilterOutput *output;
@@ -164,69 +124,53 @@ int CameraViewer(bool interpolation, bool save, int width, int height, char* por
     // Add source
     svlFilterSplitter Splitter;
     stream.SetSourceFilter(&source);
-    //source.GetOutput()->Connect(OpenIGTlinkFilter.GetInput());
-    //output = OpenIGTlinkFilter.GetOutput();
 
     Splitter.AddOutput("async_out");
     source.GetOutput()->Connect(Splitter.GetInput());
 
-
-
     svlFilterImageChannelSwapper rgb_swapper;
     Splitter.GetOutput()->Connect(rgb_swapper.GetInput());
 
-    //output = Splitter.GetOutput();
-
-
     svlOpenIGTLinkBridge OpenIGTlinkFilter;
     int inputPort = atoi(port);
-    std::cerr<<inputPort<<std::endl;
+
+    std::cout << "Using OpenIGTLink port: " << inputPort << std::endl;
+
     OpenIGTlinkFilter.SetPortNumber(inputPort);
     OpenIGTlinkFilter.SetDeviceName("OpenIGTLink Conversion Filter");
     rgb_swapper.GetOutput()->Connect(OpenIGTlinkFilter.GetInput());
     
-
     output = Splitter.GetOutput("async_out");//OpenIGTlinkFilter.GetOutput();
-
-    // Add window
-    // Add shifter if fullscreen
-    /*
-	if (fullscreen >= 0) {
-        output->Connect(shifter.GetInput());
-            output = shifter.GetOutput();
-	}
-    */
 
     // Add resizer if required
     if (width > 0 && height > 0) {
         output->Connect(resizer.GetInput());
-            output = resizer.GetOutput();
+        output = resizer.GetOutput();
     }
 
     output->Connect(window.GetInput());
-        output = window.GetOutput();
+    output = window.GetOutput();
 
-    cerr << "Starting stream... ";
+    std::cout << "Starting stream... ";
 
     // initialize and start stream
-    if (stream.Play() != SVL_OK) return 0;
+    if (stream.Play() != SVL_OK) {
+        std::cerr << "Failed to start stream" << std::endl;
+        return 0;
+    }
 
-    cerr << "Done" << endl;
+    std::cout << "Done" << std::endl;
 
     // wait for keyboard input in command window
     int ch;
-
     do {
         ch = cmnGetChar();
-
-        switch (ch)
-        {
-
-            default:
+        switch (ch) {
+        default:
             break;
         }
     } while (ch != 'q');
-
+    
     // stop stream
     stream.Stop();
 
@@ -237,7 +181,7 @@ int CameraViewer(bool interpolation, bool save, int width, int height, char* por
     stream.Release();
     stream.DisconnectAll();
 
-    cerr << "Stream released" << endl;
+    std::cout << "Stream released" << std::endl;
 
     return 0;
 }
@@ -246,7 +190,7 @@ int CameraViewer(bool interpolation, bool save, int width, int height, char* por
 //////////////////////////////////
 //             main             //
 //////////////////////////////////
-int my_main(int argc, char** argv)
+int main(int argc, char** argv)
 {
     bool interpolation = false;
     bool save = false;
@@ -255,15 +199,12 @@ int my_main(int argc, char** argv)
 
     //////////////////////////////
     // starting viewer
-    if(argc > 1){
+    if (argc > 1) {
         CameraViewer(interpolation, save, width, height, argv[1]);
     }
-    else{
-        std::cerr<<"Enter desired port number, eg ./sawOpenIGTLinkSvlExample 18944" << std::endl;
+    else {
+        std::cerr << "Enter desired port number, eg ./sawOpenIGTLinkSvlExample 18944" << std::endl;
     }
-
-    cerr << "Quit" << endl;
+    std::cout << "Quit" << std::endl;
     return 1;
 }
-
-SETUP_QT_ENVIRONMENT(my_main)

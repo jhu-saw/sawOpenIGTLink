@@ -12,36 +12,41 @@
 # To find FindOpenIGTLink.cmake
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR})
 
-find_package (OpenIGTLink REQUIRED)
+# Version 2+ is required but somehow OpenIGTLinkConfig doesn't define version
+find_package (OpenIGTLink REQUIRED
+              HINTS igtl /usr/lib/igtl /usr/local/lib/igtl)
 
 if (OpenIGTLink_FOUND)
+
+  # OpenIGTLink settings
+  include (${OpenIGTLink_USE_FILE})
 
   set (REQUIRED_CISST_LIBRARIES cisstCommon
                                 cisstVector
                                 cisstOSAbstraction
                                 cisstMultiTask
+                                cisstStereoVision
                                 cisstParameterTypes)
 
   find_package (cisst REQUIRED ${REQUIRED_CISST_LIBRARIES})
 
   if (cisst_FOUND_AS_REQUIRED)
 
-    # OpenIGTLink code
-    include (${OpenIGTLink_USE_FILE})
-
     # load cisst configuration
     include (${CISST_USE_FILE})
 
-##################
-  # catkin/ROS paths
+    # set flag to indicate that sawOpenIGTLink has been compiled with SVL
+    # ideally this should be optional
+    set (sawOpenIGTLink_HAS_SVL ON)
+
+    # catkin/ROS paths
     cisst_is_catkin_build (sawOpenIGTLink_IS_CATKIN_BUILT)
     if (sawOpenIGTLink_IS_CATKIN_BUILT)
-     set (sawOpenIGTLink_CONFIG_FILE_DIR "${CATKIN_DEVEL_PREFIX}/cmake")
-     set (LIBRARY_OUTPUT_PATH "${sawOpenIGTLink_BINARY_DIR}/lib")
+       set (sawOpenIGTLink_CONFIG_FILE_DIR "${CATKIN_DEVEL_PREFIX}/cmake")
+       set (LIBRARY_OUTPUT_PATH "${sawOpenIGTLink_BINARY_DIR}/lib")
     else ()
-     set (sawOpenIGTLink_CONFIG_FILE_DIR "${sawOpenIGTLink_BINARY_DIR}")
+       set (sawOpenIGTLink_CONFIG_FILE_DIR "${sawOpenIGTLink_BINARY_DIR}")
     endif ()
-###############
 
     # create/configure file for find_package (sawOpenIGTLink)
     set (sawOpenIGTLink_INCLUDE_DIR "${sawOpenIGTLink_SOURCE_DIR}/include")
@@ -49,16 +54,7 @@ if (OpenIGTLink_FOUND)
     set (sawOpenIGTLink_LIBRARIES sawOpenIGTLink ${OpenIGTLink_LIBRARIES})
 
     include_directories (${sawOpenIGTLink_INCLUDE_DIR})
-###############
-    cisst_is_catkin_build (sawOpenIGTLink_IS_CATKIN_BUILT)
-    if (sawOpenIGTLink_IS_CATKIN_BUILT)
-     set (sawOpenIGTLink_CONFIG_FILE_DIR "${CATKIN_DEVEL_PREFIX}/cmake")
-     set (LIBRARY_OUTPUT_PATH "${sawOpenIGTLink_BINARY_DIR}/lib")
-     message (BDBDLSHVHVBLSDLHVBBH:SDBH:KSDF::BJSFDBJ:SFBJ:KSFBJ:KSFJBBJFJ:CATKINBUILT)
-    else ()
-     set (sawOpenIGTLink_CONFIG_FILE_DIR "${sawOpenIGTLink_BINARY_DIR}")
-    endif ()
-###############
+
     set (sawOpenIGTLink_HEADER_DIR "${sawOpenIGTLink_INCLUDE_DIR}/sawOpenIGTLink")
     add_library (sawOpenIGTLink ${IS_SHARED}
                  ${sawOpenIGTLink_HEADER_DIR}/sawOpenIGTLinkExport.h
@@ -68,6 +64,8 @@ if (OpenIGTLink_FOUND)
                  # new implementation (05/2015)
                  mtsOpenIGTLinkBridge.cpp
                  ${sawOpenIGTLink_HEADER_DIR}/mtsOpenIGTLinkBridge.h
+                 svlOpenIGTLinkBridge.cpp
+                 ${sawOpenIGTLink_HEADER_DIR}/svlOpenIGTLinkBridge.h
                  )
     set_property (TARGET sawOpenIGTLink PROPERTY FOLDER "sawOpenIGTLink")
     target_link_libraries (sawOpenIGTLink ${OpenIGTLink_LIBRARIES})
