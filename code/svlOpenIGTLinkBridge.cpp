@@ -1,20 +1,33 @@
-// See license at http://www.cisst.org/cisst/license.txt
+/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-    */
+/* ex: set filetype=cpp softtabstop=4 shiftwidth=4 tabstop=4 cindent expandtab: */
 
+/*
+  Author(s):  Youri Tan, Anton Deguet
+  Created on: 2015-07-24
 
-#include <cisstOSAbstraction/osaSleep.h>
+  (C) Copyright 2009-2015 Johns Hopkins University (JHU), All Rights Reserved.
 
-#include <igtl/igtlOSUtil.h>
-#include <igtl/igtlTransformMessage.h>
-#include <igtl/igtlServerSocket.h>
-#include <igtl/igtlImageMessage.h>
-#include <igtl/igtlMessageBase.h>
-#include <igtl/igtlSocket.h>
-#include <igtl/igtlImageMetaMessage.h>
-#include <igtl/igtlTransformMessage.h>
-#include <igtl/igtlPositionMessage.h>
-#include <igtl/igtl_util.h>
+--- begin cisst license - do not edit ---
 
-#include "svlOpenIGTLink.h"
+This software is provided "as is" under an open source license, with
+no warranty.  The complete license can be found in license.txt and
+http://www.cisst.org/cisst/license.txt.
+
+--- end cisst license ---
+*/
+
+// We need OpenIGTLink 2+
+#include <igtlTransformMessage.h>
+#include <igtlServerSocket.h>
+#include <igtlImageMessage.h>
+#include <igtlMessageBase.h>
+#include <igtlSocket.h>
+#include <igtlImageMetaMessage.h>
+#include <igtlTransformMessage.h>
+#include <igtlPositionMessage.h>
+#include <igtl_util.h>
+
+#include <sawOpenIGTLink/svlOpenIGTLinkBridge.h>
 
 typedef std::list<igtl::Socket::Pointer> SocketsType;
 
@@ -29,7 +42,7 @@ public:
     SocketsType                                 Sockets;
     bool                                        MessageInitialized;
 
-    int InitializeIGTLData(svlSample *inputImage);
+    int InitializeIGTLData(svlSample *   inputImage);
     void InitializeIGTServerSocket(int port);
 };
 
@@ -45,68 +58,52 @@ int svlOpenIGTLinkImageServer::InitializeIGTLData(svlSample* inputImage)
     this->IGTLImageMessage->SetEndian(igtl_is_little_endian() ? igtl::ImageMessage::ENDIAN_LITTLE : igtl::ImageMessage::ENDIAN_BIG);
 
     // Assign image transformation matrix
-    this->IGTLImageMatrix[0][0] = -1.0;  this->IGTLImageMatrix[1][0] = 0.0;  this->IGTLImageMatrix[2][0] = 0.0; this->IGTLImageMatrix[3][0] = 0.0;
-    this->IGTLImageMatrix[0][1] = 0.0;   this->IGTLImageMatrix[1][1] = -1.0; this->IGTLImageMatrix[2][1] = 0.0; this->IGTLImageMatrix[3][1] = 0.0;
-    this->IGTLImageMatrix[0][2] = 0.0;   this->IGTLImageMatrix[1][2] = 0.0;  this->IGTLImageMatrix[2][2] = 1.0; this->IGTLImageMatrix[3][2] = 0.0;
-    this->IGTLImageMatrix[0][3] = 0.0;   this->IGTLImageMatrix[1][3] = 0.0;  this->IGTLImageMatrix[2][3] = 0.0; this->IGTLImageMatrix[3][3] = 1.0;
+    this->IGTLImageMatrix[0][0] = -1.0; this->IGTLImageMatrix[1][0] = 0.0;  this->IGTLImageMatrix[2][0] = 0.0; this->IGTLImageMatrix[3][0] = 0.0;
+    this->IGTLImageMatrix[0][1] = 0.0;  this->IGTLImageMatrix[1][1] = -1.0; this->IGTLImageMatrix[2][1] = 0.0; this->IGTLImageMatrix[3][1] = 0.0;
+    this->IGTLImageMatrix[0][2] = 0.0;  this->IGTLImageMatrix[1][2] = 0.0;  this->IGTLImageMatrix[2][2] = 1.0; this->IGTLImageMatrix[3][2] = 0.0;
+    this->IGTLImageMatrix[0][3] = 0.0;  this->IGTLImageMatrix[1][3] = 0.0;  this->IGTLImageMatrix[2][3] = 0.0; this->IGTLImageMatrix[3][3] = 1.0;
 
-    int subOffset[3]={0};
-    int imageSizePixels[3]={    image->GetWidth(),
-                                image->GetHeight(),
-                                image->GetVideoChannels() };
+    int subOffset[3] = {0};
+    int imageSizePixels[3] = {image->GetWidth(),
+                              image->GetHeight(),
+                              image->GetVideoChannels()};
 
-    if(image->GetVideoChannels()==2)
-    {
-        if(image->GetWidth(SVL_LEFT) !=image->GetWidth(SVL_RIGHT) || image->GetHeight(SVL_LEFT) !=image->GetHeight(SVL_RIGHT) )
-        {
-            std::cerr<<"Stereo images are not equal size"<<std::endl;
+    if (image->GetVideoChannels() == 2) {
+        if ((image->GetWidth(SVL_LEFT) != image->GetWidth(SVL_RIGHT))
+            || (image->GetHeight(SVL_LEFT) !=image->GetHeight(SVL_RIGHT)) ) {
+            CMN_LOG_INIT_ERROR << "svlOpenIGTLinkImageServer::InitializeIGTLData: stereo images are not equal size" << std::endl;
             return SVL_FAIL;
         }
     }
 
-    std::cerr<< "Input image width: " <<
-                imageSizePixels[0] <<
-                ", height: " <<
-                imageSizePixels[1] <<
-                ", channels: " <<
-                imageSizePixels[2] <<
-                std::endl;
-
     svlStreamType type = image->GetType();
 
-    if(type == svlTypeImageMono8 || type == svlTypeImageMono8Stereo)
-    {
+    if (type == svlTypeImageMono8 || type == svlTypeImageMono8Stereo) {
         this->IGTLImageMessage->SetScalarType(igtl::ImageMessage::TYPE_INT8);
         this->IGTLImageMessage->SetNumComponents(1);
     }
-    else if(type == svlTypeImageRGB || type == svlTypeImageRGBStereo)
-    {
+    else if (type == svlTypeImageRGB || type == svlTypeImageRGBStereo) {
         this->IGTLImageMessage->SetScalarType(igtl::ImageMessage::TYPE_UINT8);
         this->IGTLImageMessage->SetNumComponents(3);
     }
-    else if(type == svlTypeImageMono16 ||type== svlTypeImageMono16Stereo )
-    {
+    else if (type == svlTypeImageMono16 ||type== svlTypeImageMono16Stereo) {
         this->IGTLImageMessage->SetScalarType(igtl::ImageMessage::TYPE_INT16);
         this->IGTLImageMessage->SetNumComponents(1);
     }
-    else if(type == svlTypeImageMono32 || type == svlTypeImageMono32Stereo)
-    {
+    else if (type == svlTypeImageMono32 || type == svlTypeImageMono32Stereo) {
         this->IGTLImageMessage->SetScalarType(igtl::ImageMessage::TYPE_INT32);
         this->IGTLImageMessage->SetNumComponents(1);
     }
-    else if(type== svlTypeImageRGBA || type==svlTypeImageRGBAStereo)
-    {
+    else if (type== svlTypeImageRGBA || type==svlTypeImageRGBAStereo) {
         this->IGTLImageMessage->SetScalarType(igtl::ImageMessage::TYPE_UINT8);
         this->IGTLImageMessage->SetNumComponents(4);
     }
-    else if(type== svlTypeImage3DMap)
-    {
+    else if (type== svlTypeImage3DMap) {
         this->IGTLImageMessage->SetScalarType(igtl::ImageMessage::TYPE_FLOAT32);
         this->IGTLImageMessage->SetNumComponents(3);
     }
-    else
-    {
-        std::cerr<<"Image type not supported"<<std::endl;
+    else {
+        CMN_LOG_INIT_ERROR << "svlOpenIGTLinkImageServer::InitializeIGTLData: image type not supported" << std::endl;
         return SVL_FAIL;
     }
 
@@ -122,20 +119,18 @@ int svlOpenIGTLinkImageServer::InitializeIGTLData(svlSample* inputImage)
 void svlOpenIGTLinkImageServer::InitializeIGTServerSocket(int port)
 {
     this->ServerSocket = igtl::ServerSocket::New();
-    int r = this->ServerSocket->CreateServer(port);
-    if (r < 0)
-    {
-        std::cerr << "Cannot create a server socket." << std::endl;
+    int result = this->ServerSocket->CreateServer(port);
+    if (result < 0) {
+        CMN_LOG_INIT_ERROR << "svlOpenIGTLinkImageServer::InitializeIGTServerSocket: cannot create a server socket" << std::endl;
         exit(0);
     }
     this->Port = port;
 }
 
-
 svlOpenIGTLinkBridge::svlOpenIGTLinkBridge() :
     svlFilterBase()                                                       // Call baseclass' constructor
 {
-    this->IGTLImageServer=0;
+    this->IGTLImageServer = 0;
     AddInput("input", true);                                              // Create synchronous input connector
     AddInputType("input", svlTypeImageRGBStereo);                         // Set sample type for input connector
     AddInputType("input", svlTypeImageRGB);                               // Set sample type for input connector
@@ -158,33 +153,29 @@ svlOpenIGTLinkBridge::svlOpenIGTLinkBridge() :
 
 svlOpenIGTLinkBridge::~svlOpenIGTLinkBridge()
 {
-    if(IGTLImageServer)
-    {
+    if (IGTLImageServer) {
         delete IGTLImageServer;
     }
 }
 
-int svlOpenIGTLinkBridge::SetDeviceName(std::string name)
+void svlOpenIGTLinkBridge::SetDeviceName(const std::string & name)
 {
     this->DeviceName = name;
-    return 1;
 }
 
-std::string svlOpenIGTLinkBridge::GetDeviceName()
+const std::string & svlOpenIGTLinkBridge::GetDeviceName(void) const
 {
     return this->IGTLImageServer->DeviceName;
 }
 
-int svlOpenIGTLinkBridge::SetPortNumber(int port)
+bool svlOpenIGTLinkBridge::SetPortNumber(int port)
 {
-    if(this->Port == -1)
-    {
+    if (this->Port == -1) {
         this->Port = port;
-        return 1;
+        return true;
     }
-    return 0;
+    return false;
 }
-
 
 int svlOpenIGTLinkBridge::Initialize(svlSample* syncInput, svlSample* &syncOutput)
 {
@@ -193,18 +184,15 @@ int svlOpenIGTLinkBridge::Initialize(svlSample* syncInput, svlSample* &syncOutpu
     this->IGTLImageServer->DeviceName = this->DeviceName;
     int success = this->IGTLImageServer->InitializeIGTLData(syncInput);
     this->IGTLImageServer->Port = -1;
-
-    syncOutput = syncInput;                                              // Pass the input sample forward to the output
-    return success;                                                        //
+    syncOutput = syncInput; // Pass the input sample forward to the output
+    return success;
 }
 
-int svlOpenIGTLinkBridge::SendIGTLImageMessages(svlSample* syncInput)
+int svlOpenIGTLinkBridge::SendIGTLImageMessages(svlSample * syncInput)
 {
     // check if we have new client
-    if (this->IGTLImageServer->IGTLImageMessage.IsNotNull())
-    {
-        if(!this->IGTLImageServer->Sockets.empty())
-        {
+    if (this->IGTLImageServer->IGTLImageMessage.IsNotNull()) {
+        if (!this->IGTLImageServer->Sockets.empty()) {
             double timeStamp = syncInput->GetTimestamp();
             igtl::TimeStamp::Pointer igtlImageTimestamp = igtl::TimeStamp::New();
             igtlImageTimestamp->SetTime(timeStamp);
@@ -212,12 +200,10 @@ int svlOpenIGTLinkBridge::SendIGTLImageMessages(svlSample* syncInput)
             const svlSampleImage * image = dynamic_cast<const svlSampleImage *>(syncInput);
             CMN_ASSERT(image);
 
-            unsigned char* destination = (unsigned char*)(this->IGTLImageServer->IGTLImageMessage->GetScalarPointer());
-
+            unsigned char * destination = (unsigned char*)(this->IGTLImageServer->IGTLImageMessage->GetScalarPointer());
             int imageSizeAtChannel = this->IGTLImageServer->IGTLImageMessage->GetImageSize() / image->GetVideoChannels();
 
-            for(unsigned int channel =0; channel < image->GetVideoChannels(); channel++  )
-            {
+            for (unsigned int channel =0; channel < image->GetVideoChannels(); channel++) {
                 memcpy(destination + imageSizeAtChannel * channel,
                        image->GetUCharPointer(channel),
                        imageSizeAtChannel);
@@ -235,14 +221,12 @@ int svlOpenIGTLinkBridge::SendIGTLImageMessages(svlSample* syncInput)
 
             for (socketIter = this->IGTLImageServer->Sockets.begin();
                  socketIter != endSockets;
-                 ++socketIter)
-            {
+                 ++socketIter) {
                 igtl::Socket::Pointer socket = *socketIter;
-				socket->SetTimeout(1000);
+                socket->SetTimeout(1000);
                 int socketSuccess = socket->Send(this->IGTLImageServer->IGTLImageMessage->GetPackPointer(),
                                                  this->IGTLImageServer->IGTLImageMessage->GetPackSize());
-                if (socketSuccess==0 /*|| socketSuccess==-1*/)
-                {
+                if (socketSuccess==0) {
                     // log some information and remove from list
                     std::string address;
                     int port;
@@ -265,29 +249,25 @@ int svlOpenIGTLinkBridge::SendIGTLImageMessages(svlSample* syncInput)
                 this->IGTLImageServer->Sockets.erase(*removedIter);
             }
         }
-        else
-        {
+        else {
             return SVL_FAIL;
         }
     }
-    else
-    {
+    else {
         std::cerr << "Broken Message!";
     }
     return 1;
 }
 
-int svlOpenIGTLinkBridge::Process(svlProcInfo* procInfo, svlSample* syncInput, svlSample* &syncOutput)
+int svlOpenIGTLinkBridge::Process(svlProcInfo * procInfo, svlSample * syncInput, svlSample* &syncOutput)
 {
     _OnSingleThread(procInfo)                                               // Execute the following block on one thread only
     {
-        if(this->IGTLImageServer->DeviceName!=this->DeviceName)
-        {
+        if (this->IGTLImageServer->DeviceName != this->DeviceName) {
             this->IGTLImageServer->DeviceName = this->DeviceName;
         }
 
-        if(this->IGTLImageServer->Port!=-1)
-        {
+        if (this->IGTLImageServer->Port != -1) {
             igtl::Socket::Pointer newSocket;
 
             // First check if there are new clients
@@ -302,19 +282,18 @@ int svlOpenIGTLinkBridge::Process(svlProcInfo* procInfo, svlSample* syncInput, s
                           << address << ":" << port << std::endl;
                 // set socket time out
                 //newSocket->SetReceiveTimeout(10);
-				newSocket->SetTimeout(1000);
+                newSocket->SetTimeout(1000);
                 // add new socket to the list
                 this->IGTLImageServer->Sockets.push_back(newSocket);
             }
-
             this->SendIGTLImageMessages(syncInput);
         }
-        else{
-            if(this->Port!=-1 && this->IGTLImageServer->Port==-1 )
-            {
-                std::cerr<<"Asign port number, namely: "
-                        << this->Port
-                        <<std::endl;
+        else {
+            if ((this->Port != -1)
+                && (this->IGTLImageServer->Port == -1)) {
+                std::cerr << "Asign port number, namely: "
+                          << this->Port
+                          << std::endl;
                 this->IGTLImageServer->InitializeIGTServerSocket(Port);
             }
         }

@@ -14,10 +14,10 @@ public:
     svlOpenIGTLinkBridge();
     virtual ~svlOpenIGTLinkBridge();
 
-    int SetPortNumber(int port);
-    int GetPortNumber();
-    int SetDeviceName(std::string name);
-    std::string GetDeviceName();
+    bool SetPortNumber(int port);
+    int GetPortNumber(void) const;
+    void SetDeviceName(const std::string & name);
+    const std::string & GetDeviceName(void) const;
 
     svlOpenIGTLinkImageServer* IGTLImageServer;
     std::string DeviceName;

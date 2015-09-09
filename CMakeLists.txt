@@ -1,7 +1,5 @@
 #
-#
-# (C) Copyright 2011 Johns Hopkins University (JHU), All Rights
-# Reserved.
+# (C) Copyright 2011-2015 Johns Hopkins University (JHU), All Rights Reserved.
 #
 # --- begin cisst license - do not edit ---
 #
@@ -12,5 +10,7 @@
 # --- end cisst license ---
 
 project (sawOpenIGTLink)
+cmake_minimum_required (VERSION 2.8)
+
 add_subdirectory (code)
 add_subdirectory (examples)
