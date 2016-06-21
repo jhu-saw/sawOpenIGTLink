@@ -64,9 +64,9 @@ int svlOpenIGTLinkImageServer::InitializeIGTLData(svlSample* inputImage)
     this->IGTLImageMatrix[0][3] = 0.0;  this->IGTLImageMatrix[1][3] = 0.0;  this->IGTLImageMatrix[2][3] = 0.0; this->IGTLImageMatrix[3][3] = 1.0;
 
     int subOffset[3] = {0};
-    int imageSizePixels[3] = {image->GetWidth(),
-                              image->GetHeight(),
-                              image->GetVideoChannels()};
+    int imageSizePixels[3] = {static_cast<int>(image->GetWidth()),
+                              static_cast<int>(image->GetHeight()),
+                              static_cast<int>(image->GetVideoChannels())};
 
     if (image->GetVideoChannels() == 2) {
         if ((image->GetWidth(SVL_LEFT) != image->GetWidth(SVL_RIGHT))

@@ -101,8 +101,6 @@ int CameraViewer(bool interpolation, bool save, int width, int height, char* por
     window.SetEventHandler(&window_eh);
     window.SetTitle("Camera Viewer");
 
-    int fullscreen = 1;
-
     // Set to FALSE if fullscreen is not desired 
     window.SetFullScreen(true);
 

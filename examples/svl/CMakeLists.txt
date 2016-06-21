@@ -2,7 +2,7 @@
 #   Author(s):  Ali Uneri
 #   Created on: 2009-08-13
 #
-#   (C) Copyright 2009-2015 Johns Hopkins University (JHU), All Rights Reserved.
+#   (C) Copyright 2009-2016 Johns Hopkins University (JHU), All Rights Reserved.
 #
 # --- begin cisst license - do not edit ---
 #
@@ -39,7 +39,7 @@ if (cisst_FOUND_AS_REQUIRED)
   endif(OpenIGTLink_FOUND)
 
   # sawOpenIGTLink has been compiled within cisst, we should find it automatically
-  cisst_find_saw_component (sawOpenIGTLink REQUIRED)
+  find_package (sawOpenIGTLink REQUIRED)
 
   if (sawOpenIGTLink_FOUND)
 
