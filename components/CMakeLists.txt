@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2016 Johns Hopkins University (JHU), All Rights Reserved.
+# (C) Copyright 2011-2017 Johns Hopkins University (JHU), All Rights Reserved.
 #
 # --- begin cisst license - do not edit ---
 #
@@ -14,7 +14,7 @@ project (sawOpenIGTLink)
 cmake_minimum_required (VERSION 2.8)
 
 # Version 2+ is required but somehow OpenIGTLinkConfig doesn't define version
-find_package (OpenIGTLink REQUIRED
+find_package (OpenIGTLink
               HINTS igtl /usr/lib/igtl /usr/local/lib/igtl)
 
 if (OpenIGTLink_FOUND)
@@ -110,5 +110,5 @@ if (OpenIGTLink_FOUND)
   endif (cisst_FOUND_AS_REQUIRED)
 
 else (OpenIGTLink_FOUND)
-  message ("Information: code in ${CMAKE_CURRENT_SOURCE_DIR} requires OpenIGTLink.  Please install OpenIGTLink.  You might also have to set the OpenIGTLink directory manually using CMake, e.g. ccmake ${CMAKE_CURRENT_BINARY_DIR} or cmake-gui ${CMAKE_CURRENT_BINARY_DIR}")
+  message ("Information: code in ${CMAKE_CURRENT_SOURCE_DIR} requires OpenIGTLink.  Please install OpenIGTLink.  You might also have to set the OpenIGTLink directory manually using CMake, e.g. ccmake ${CMAKE_CURRENT_BINARY_DIR}")
 endif (OpenIGTLink_FOUND)

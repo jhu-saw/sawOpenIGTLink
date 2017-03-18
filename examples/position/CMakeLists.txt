@@ -2,7 +2,7 @@
 #   Author(s):  Ali Uneri
 #   Created on: 2009-08-13
 #
-#   (C) Copyright 2009-2016 Johns Hopkins University (JHU), All Rights Reserved.
+#   (C) Copyright 2009-2017 Johns Hopkins University (JHU), All Rights Reserved.
 #
 # --- begin cisst license - do not edit ---
 #
@@ -30,34 +30,37 @@ if (cisst_FOUND_AS_REQUIRED)
     set (EXECUTABLE_OUTPUT_PATH "${CATKIN_DEVEL_PREFIX}/bin")
   endif ()
 
-  find_package (OpenIGTLink REQUIRED)
+  find_package (OpenIGTLink)
 
   if (OpenIGTLink_FOUND)
      # OpenIGTLink code
     include (${OpenIGTLink_USE_FILE})
-  endif(OpenIGTLink_FOUND)
+  endif (OpenIGTLink_FOUND)
 
   # sawOpenIGTLink has been compiled within cisst, we should find it automatically
-  find_package (sawOpenIGTLink REQUIRED)
+  find_package (sawOpenIGTLink)
 
   if (sawOpenIGTLink_FOUND)
     include_directories (${sawOpenIGTLink_INCLUDE_DIR})
     link_directories (${sawOpenIGTLink_LIBRARY_DIR})
 
-        fltk_wrap_ui (sawOpenIGTLinkExampleFLTK
-                      trackerUI.fl
-                      )
+    fltk_wrap_ui (sawOpenIGTLinkExampleFLTK
+                  trackerUI.fl
+                  )
 
-        add_executable (sawOpenIGTLinkExampleFLTK
-                        main.cpp
-                        trackerSimulator.cpp
-                        trackerSimulator.h
-                        ${sawOpenIGTLinkExampleFLTK_FLTK_UI_SRCS}
-                        )
+    add_executable (sawOpenIGTLinkExampleFLTK
+                    main.cpp
+                    trackerSimulator.cpp
+                    trackerSimulator.h
+                    ${sawOpenIGTLinkExampleFLTK_FLTK_UI_SRCS}
+                    )
 
-        set_property (TARGET sawOpenIGTLinkExampleFLTK PROPERTY FOLDER "sawOpenIGTLink")
-        target_link_libraries (sawOpenIGTLinkExampleFLTK ${sawOpenIGTLink_LIBRARIES})
-        cisst_target_link_libraries (sawOpenIGTLinkExampleFLTK ${REQUIRED_CISST_LIBRARIES})
+    set_property (TARGET sawOpenIGTLinkExampleFLTK PROPERTY FOLDER "sawOpenIGTLink")
+    target_link_libraries (sawOpenIGTLinkExampleFLTK ${sawOpenIGTLink_LIBRARIES})
+    cisst_target_link_libraries (sawOpenIGTLinkExampleFLTK ${REQUIRED_CISST_LIBRARIES})
+
+  else (sawOpenIGTLink_FOUND)
+    message ("Information: code in ${CMAKE_CURRENT_SOURCE_DIR} will not be compiled, it requires sawOpenIGTLink")
   endif (sawOpenIGTLink_FOUND)
 
 else (cisst_FOUND_AS_REQUIRED)
