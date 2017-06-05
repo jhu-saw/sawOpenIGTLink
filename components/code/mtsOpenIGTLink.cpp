@@ -91,8 +91,9 @@ void mtsOpenIGTLink::Configure(const std::string & hostAndPort)
         Port = port;
         SocketServer = 0;
         Socket = new osaSocket();
-        IGTLData = new sawOpenIGTLinkData;
     }
+    IGTLData = new sawOpenIGTLinkData;
+    
     IsConnected = false;
 
     mtsInterfaceProvided * providesPositionCartesian = AddInterfaceProvided("ProvidesPositionCartesian");
