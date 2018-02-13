@@ -13,28 +13,33 @@ project (sawOpenIGTLink)
 
 cmake_minimum_required (VERSION 2.8)
 
-# Version 2+ is required but somehow OpenIGTLinkConfig doesn't define version
-find_package (OpenIGTLink
-              HINTS igtl /usr/lib/igtl /usr/local/lib/igtl)
+option (SAW_OPEN_IGT_LINK_HAS_cisstStereoVision "Build cisstStereoVision support for igtl (experimental)" OFF)
 
-if (OpenIGTLink_FOUND)
+set (REQUIRED_CISST_LIBRARIES cisstCommon
+                              cisstVector
+                              cisstOSAbstraction
+                              cisstMultiTask
+                              cisstParameterTypes)
 
-  # OpenIGTLink settings
-  include (${OpenIGTLink_USE_FILE})
+if (SAW_OPEN_IGT_LINK_HAS_cisstStereoVision)
+  set (REQUIRED_CISST_LIBRARIES ${REQUIRED_CISST_LIBRARIES} cisstStereoVision)
+endif ()
 
-  set (REQUIRED_CISST_LIBRARIES cisstCommon
-                                cisstVector
-                                cisstOSAbstraction
-                                cisstMultiTask
-                                cisstParameterTypes
-                                cisstStereoVision)
+find_package (cisst 1.0.9 COMPONENTS ${REQUIRED_CISST_LIBRARIES})
 
-  find_package (cisst REQUIRED ${REQUIRED_CISST_LIBRARIES})
+if (cisst_FOUND_AS_REQUIRED)
 
-  if (cisst_FOUND_AS_REQUIRED)
+  # load cisst configuration
+  include (${CISST_USE_FILE})
 
-    # load cisst configuration
-    include (${CISST_USE_FILE})
+  # Version 2+ is required but somehow OpenIGTLinkConfig doesn't define version
+  find_package (OpenIGTLink
+                HINTS igtl /usr/lib/igtl /usr/local/lib/igtl /usr/local/)
+
+  if (OpenIGTLink_FOUND)
+
+    # OpenIGTLink settings
+    include (${OpenIGTLink_USE_FILE})
 
     # catkin/ROS paths
     cisst_is_catkin_build (sawOpenIGTLink_IS_CATKIN_BUILT)
@@ -63,17 +68,25 @@ if (OpenIGTLink_FOUND)
     include_directories (${sawOpenIGTLink_INCLUDE_DIR})
 
     set (sawOpenIGTLink_HEADER_DIR "${sawOpenIGTLink_INCLUDE_DIR}/sawOpenIGTLink")
+    set (sawOpenIGTLink_SRC
+         ${sawOpenIGTLink_HEADER_DIR}/sawOpenIGTLinkExport.h
+         # old implementation
+         code/mtsOpenIGTLink.cpp
+         ${sawOpenIGTLink_HEADER_DIR}/mtsOpenIGTLink.h
+         # new implementation (05/2015)
+         code/mtsOpenIGTLinkBridge.cpp
+         ${sawOpenIGTLink_HEADER_DIR}/mtsOpenIGTLinkBridge.h)
+
+    if (SAW_OPEN_IGT_LINK_HAS_cisstStereoVision)
+      set (sawOpenIGTLink_SRC
+           ${sawOpenIGTLink_SRC}
+           code/svlOpenIGTLinkBridge.cpp
+           ${sawOpenIGTLink_HEADER_DIR}/svlOpenIGTLinkBridge.h)
+    endif ()
+
     add_library (sawOpenIGTLink ${IS_SHARED}
-                 ${sawOpenIGTLink_HEADER_DIR}/sawOpenIGTLinkExport.h
-                 # old implementation
-                 code/mtsOpenIGTLink.cpp
-                 ${sawOpenIGTLink_HEADER_DIR}/mtsOpenIGTLink.h
-                 # new implementation (05/2015)
-                 code/mtsOpenIGTLinkBridge.cpp
-                 ${sawOpenIGTLink_HEADER_DIR}/mtsOpenIGTLinkBridge.h
-                 code/svlOpenIGTLinkBridge.cpp
-                 ${sawOpenIGTLink_HEADER_DIR}/svlOpenIGTLinkBridge.h
-                 )
+                 ${sawOpenIGTLink_SRC})
+
     set_property (TARGET sawOpenIGTLink PROPERTY FOLDER "sawOpenIGTLink")
     target_link_libraries (sawOpenIGTLink ${OpenIGTLink_LIBRARIES})
     cisst_target_link_libraries (sawOpenIGTLink ${REQUIRED_CISST_LIBRARIES})
@@ -105,10 +118,10 @@ if (OpenIGTLink_FOUND)
     install (FILES "${sawOpenIGTLink_BINARY_DIR}/sawOpenIGTLinkConfig.cmake"
              DESTINATION "${CISST_CMAKE_INSTALL_SUFFIX}/saw")
 
-  else (cisst_FOUND_AS_REQUIRED)
-    message ("Information: code in ${CMAKE_CURRENT_SOURCE_DIR} will not be compiled, it requires ${REQUIRED_CISST_LIBRARIES}")
-  endif (cisst_FOUND_AS_REQUIRED)
+  else (OpenIGTLink_FOUND)
+    message ("Information: code in ${CMAKE_CURRENT_SOURCE_DIR} requires OpenIGTLink.  Please install OpenIGTLink.  You might also have to set the OpenIGTLink directory manually using CMake, e.g. ccmake ${CMAKE_CURRENT_BINARY_DIR}")
+  endif (OpenIGTLink_FOUND)
 
-else (OpenIGTLink_FOUND)
-  message ("Information: code in ${CMAKE_CURRENT_SOURCE_DIR} requires OpenIGTLink.  Please install OpenIGTLink.  You might also have to set the OpenIGTLink directory manually using CMake, e.g. ccmake ${CMAKE_CURRENT_BINARY_DIR}")
-endif (OpenIGTLink_FOUND)
+else (cisst_FOUND_AS_REQUIRED)
+  message ("Information: code in ${CMAKE_CURRENT_SOURCE_DIR} will not be compiled, it requires ${REQUIRED_CISST_LIBRARIES}")
+endif (cisst_FOUND_AS_REQUIRED)

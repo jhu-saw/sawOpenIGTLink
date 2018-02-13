@@ -10,7 +10,6 @@
 
   <build_depend>cisst_netlib</build_depend>
   <build_depend>cisst</build_depend>
-
   <run_depend>cisst_netlib</run_depend>
   <run_depend>cisst</run_depend>
 
