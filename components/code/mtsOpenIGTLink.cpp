@@ -2,11 +2,10 @@
 /* ex: set filetype=cpp softtabstop=4 shiftwidth=4 tabstop=4 cindent expandtab: */
 
 /*
-
   Author(s):  Ali Uneri
   Created on: 2009-08-10
 
-  (C) Copyright 2009-2012 Johns Hopkins University (JHU), All Rights Reserved.
+  (C) Copyright 2009-2018 Johns Hopkins University (JHU), All Rights Reserved.
 
 --- begin cisst license - do not edit ---
 
@@ -21,9 +20,9 @@ http://www.cisst.org/cisst/license.txt.
 #include <cisstMultiTask/mtsInterfaceProvided.h>
 #include <sawOpenIGTLink/mtsOpenIGTLink.h>
 
-#include <igtl_util.h>
-#include <igtl_header.h>
-#include <igtl_transform.h>
+#include <igtl/igtl_util.h>
+#include <igtl/igtl_header.h>
+#include <igtl/igtl_transform.h>
 
 CMN_IMPLEMENT_SERVICES_DERIVED_ONEARG(mtsOpenIGTLink, mtsTaskPeriodic, mtsTaskPeriodicConstructorArg);
 

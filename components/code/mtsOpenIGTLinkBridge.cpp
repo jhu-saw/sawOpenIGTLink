@@ -5,7 +5,7 @@
   Author(s):  Youri Tan, Anton Deguet
   Created on: 2015-07-24
 
-  (C) Copyright 2009-2015 Johns Hopkins University (JHU), All Rights Reserved.
+  (C) Copyright 2009-2018 Johns Hopkins University (JHU), All Rights Reserved.
 
 --- begin cisst license - do not edit ---
 
@@ -17,9 +17,9 @@ http://www.cisst.org/cisst/license.txt.
 */
 
 
-#include <igtlOSUtil.h>
-#include <igtlTransformMessage.h>
-#include <igtlServerSocket.h>
+#include <igtl/igtlOSUtil.h>
+#include <igtl/igtlTransformMessage.h>
+#include <igtl/igtlServerSocket.h>
 
 #include <sawOpenIGTLink/mtsOpenIGTLinkBridge.h>
 #include <cisstMultiTask/mtsInterfaceRequired.h>
