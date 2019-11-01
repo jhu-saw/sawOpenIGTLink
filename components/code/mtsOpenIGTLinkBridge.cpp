@@ -24,6 +24,7 @@ http://www.cisst.org/cisst/license.txt.
 #include <sawOpenIGTLink/mtsOpenIGTLinkBridge.h>
 #include <cisstMultiTask/mtsInterfaceRequired.h>
 #include <cisstMultiTask/mtsInterfaceProvided.h>
+#include <cisstMultiTask/mtsManagerLocal.h>
 #include <cisstParameterTypes/prmPositionCartesianGet.h>
 #include <cisstParameterTypes/prmPositionCartesianSet.h>
 
