@@ -166,11 +166,11 @@ bool mtsOpenIGTLink::SendFrame(const prmPositionCartesianGet & frameCISST)
 
     igtl_uint64 crc = crc64(0, 0, 0LL);  // initial CRC
 
-    IGTLData->HeaderIGT.version   = IGTL_HEADER_VERSION;
+    IGTLData->HeaderIGT.header_version = IGTL_HEADER_VERSION_2;
     IGTLData->HeaderIGT.timestamp = 0;
     IGTLData->HeaderIGT.body_size = IGTL_TRANSFORM_SIZE;
-    IGTLData->HeaderIGT.crc       = crc64(reinterpret_cast<unsigned char *>(IGTLData->FrameIGT),
-                                          IGTL_TRANSFORM_SIZE, crc);
+    IGTLData->HeaderIGT.crc = crc64(reinterpret_cast<unsigned char *>(IGTLData->FrameIGT),
+                                    IGTL_TRANSFORM_SIZE, crc);
 
     strncpy(IGTLData->HeaderIGT.name, "TRANSFORM", 12);
     strncpy(IGTLData->HeaderIGT.device_name, GetName().c_str(), 20);

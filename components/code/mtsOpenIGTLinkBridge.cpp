@@ -233,7 +233,7 @@ bool mtsOpenIGTLinkBridge::AddServerFromCommandWrite(const int port,
     }
     if (bridge->InterfaceProvided) {
         // add write function
-        bridge->mStateTable->AddData(bridge->PositionCartesianSet, "GetPositionCartesian");
+        bridge->mStateTable->AddData(bridge->PositionCartesianSet, "measured_cp");
         if (!bridge->InterfaceProvided->AddCommandReadState(*bridge->mStateTable, bridge->PositionCartesianSet, commandName)) {
             CMN_LOG_CLASS_INIT_ERROR << "AddServerFromReadWrite: can't add function \""
                                      << commandName << "\" to interface \""
@@ -287,7 +287,12 @@ void mtsOpenIGTLinkBridge::ServerSend(mtsOpenIGTLinkBridgeData * bridge)
         igtl::Matrix4x4 dataMatrix;
         bridge->CISSTToIGT(bridge->PositionCartesianGet, dataMatrix);
         bridge->TransformMessage->SetMatrix(dataMatrix);
+        igtl::TimeStamp::Pointer ts;
+        ts = igtl::TimeStamp::New();
+        ts->SetTime(bridge->PositionCartesianGet.Timestamp());
+        bridge->TransformMessage->SetTimeStamp(ts);
         bridge->TransformMessage->Pack();
+        
 
         typedef std::list<mtsOpenIGTLinkBridgeData::SocketsType::iterator> RemovedType;
         RemovedType toBeRemoved;
@@ -461,10 +466,9 @@ void mtsOpenIGTLinkBridgeData::CISSTToIGT(const prmPositionCartesianGet & frameC
     frameIGTL[2][2] = frameCISST.Position().Rotation().Element(2, 2);
     frameIGTL[3][2] = 0.0;
 
-    // meter to mm conversion -> remove?
-    frameIGTL[0][3] = frameCISST.Position().Translation().Element(0) * 1000.0;
-    frameIGTL[1][3] = frameCISST.Position().Translation().Element(1) * 1000.0;
-    frameIGTL[2][3] = frameCISST.Position().Translation().Element(2) * 1000.0;
+    frameIGTL[0][3] = frameCISST.Position().Translation().Element(0);
+    frameIGTL[1][3] = frameCISST.Position().Translation().Element(1);
+    frameIGTL[2][3] = frameCISST.Position().Translation().Element(2);
     frameIGTL[3][3] = 1.0;
 }
 
