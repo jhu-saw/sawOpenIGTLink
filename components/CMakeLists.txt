@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2017 Johns Hopkins University (JHU), All Rights Reserved.
+# (C) Copyright 2011-2020 Johns Hopkins University (JHU), All Rights Reserved.
 #
 # --- begin cisst license - do not edit ---
 #
@@ -32,12 +32,19 @@ if (cisst_FOUND_AS_REQUIRED)
   # load cisst configuration
   include (${CISST_USE_FILE})
 
-  # Version 2+ is required but somehow OpenIGTLinkConfig doesn't define version
+  # Version 3+ is required but it seems OpenIGTLink isn't configured to provide version for find_package
   find_package (OpenIGTLink
-                HINTS igtl /usr/lib/igtl /usr/local/lib/igtl /usr/local/)
+                HINTS igtl /usr/lib/igtl /usr/local/lib/igtl/cmake/igtl-3.1 /usr/local/lib/igtl /usr/local/)
+
+  # Testing version found
+  if (OpenIGTLink_FOUND)
+    if (NOT ("${OpenIGTLink_VERSION_MAJOR}" STREQUAL "3"))
+      message ("Information: code in ${CMAKE_CURRENT_SOURCE_DIR} will not be compiled, looking for OpenIGTLink version 3 but found ${OpenIGTLink_VERSION_MAJOR}")
+      set (OpenIGTLink_FOUND FALSE)
+    endif ()
+  endif ()
 
   if (OpenIGTLink_FOUND)
-
     # OpenIGTLink settings
     include (${OpenIGTLink_USE_FILE})
 
@@ -46,7 +53,7 @@ if (cisst_FOUND_AS_REQUIRED)
     if (sawOpenIGTLink_IS_CATKIN_BUILT)
        set (sawOpenIGTLink_CONFIG_FILE_DIR
             "${CATKIN_DEVEL_PREFIX}/share/sawOpenIGTLink/cmake")
-       set (LIBRARY_OUTPUT_PATH "${sawOpenIGTLink_BINARY_DIR}/lib")
+       set (LIBRARY_OUTPUT_PATH "${CATKIN_DEVEL_PREFIX}/lib")
     else ()
        set (sawOpenIGTLink_CONFIG_FILE_DIR "${sawOpenIGTLink_BINARY_DIR}")
     endif ()
