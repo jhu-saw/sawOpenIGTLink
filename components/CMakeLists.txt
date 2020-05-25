@@ -81,8 +81,14 @@ if (cisst_FOUND_AS_REQUIRED)
          code/mtsOpenIGTLink.cpp
          ${sawOpenIGTLink_HEADER_DIR}/mtsOpenIGTLink.h
          # new implementation (05/2015)
-         code/mtsOpenIGTLinkBridge.cpp
-         ${sawOpenIGTLink_HEADER_DIR}/mtsOpenIGTLinkBridge.h)
+         code/mtsCISSTToIGTL.cpp
+         ${sawOpenIGTLink_HEADER_DIR}/mtsCISSTToIGTL.h
+         code/mtsIGTLToCISST.cpp
+         ${sawOpenIGTLink_HEADER_DIR}/mtsIGTLToCISST.h
+         code/mtsIGTLBridge.cpp
+         ${sawOpenIGTLink_HEADER_DIR}/mtsIGTLBridge.h
+         code/mtsIGTLCRTKBridge.cpp
+         ${sawOpenIGTLink_HEADER_DIR}/mtsIGTLCRTKBridge.h)
 
     if (SAW_OPEN_IGT_LINK_HAS_cisstStereoVision)
       set (sawOpenIGTLink_SRC

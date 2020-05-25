@@ -18,10 +18,12 @@ http://www.cisst.org/cisst/license.txt.
 
 
 #include <igtlOSUtil.h>
-#include <igtlTransformMessage.h>
 #include <igtlServerSocket.h>
 
 #include <sawOpenIGTLink/mtsOpenIGTLinkBridge.h>
+#include <sawOpenIGTLink/mtsCISSTToIGTL.h>
+#include <sawOpenIGTLink/mtsIGTLToCISST.h>
+
 #include <cisstMultiTask/mtsInterfaceRequired.h>
 #include <cisstMultiTask/mtsInterfaceProvided.h>
 #include <cisstMultiTask/mtsManagerLocal.h>
@@ -55,13 +57,6 @@ public:
     prmPositionCartesianSet PositionCartesianSet;
 
     mtsStateTable * mStateTable;
-
-    // takes in cisst frame and outputs igtl frame
-    void CISSTToIGT(const prmPositionCartesianGet & frameCISST,
-                    igtl::Matrix4x4 & frameIGTL);
-
-    void IGTtoCISST(const igtl::Matrix4x4 & frameIGTL,
-                    prmPositionCartesianSet & frameCISST);
 
     void ProcessIncomingMessage(mtsOpenIGTLinkBridgeData * bridge,
                                 igtl::Socket::Pointer socket,
@@ -285,7 +280,7 @@ void mtsOpenIGTLinkBridge::ServerSend(mtsOpenIGTLinkBridgeData * bridge)
 
     if (dataNeedsSend) {
         igtl::Matrix4x4 dataMatrix;
-        bridge->CISSTToIGT(bridge->PositionCartesianGet, dataMatrix);
+        mtsCISSTToIGTL(bridge->PositionCartesianGet, dataMatrix);
         bridge->TransformMessage->SetMatrix(dataMatrix);
         igtl::TimeStamp::Pointer ts;
         ts = igtl::TimeStamp::New();
@@ -448,50 +443,6 @@ void mtsOpenIGTLinkBridge::Run(void)
     }
 }
 
-void mtsOpenIGTLinkBridgeData::CISSTToIGT(const prmPositionCartesianGet & frameCISST,
-                                          igtl::Matrix4x4 & frameIGTL)
-{
-    frameIGTL[0][0] = frameCISST.Position().Rotation().Element(0, 0);
-    frameIGTL[1][0] = frameCISST.Position().Rotation().Element(1, 0);
-    frameIGTL[2][0] = frameCISST.Position().Rotation().Element(2, 0);
-    frameIGTL[3][0] = 0.0;
-
-    frameIGTL[0][1] = frameCISST.Position().Rotation().Element(0, 1);
-    frameIGTL[1][1] = frameCISST.Position().Rotation().Element(1, 1);
-    frameIGTL[2][1] = frameCISST.Position().Rotation().Element(2, 1);
-    frameIGTL[3][1] = 0.0;
-
-    frameIGTL[0][2] = frameCISST.Position().Rotation().Element(0, 2);
-    frameIGTL[1][2] = frameCISST.Position().Rotation().Element(1, 2);
-    frameIGTL[2][2] = frameCISST.Position().Rotation().Element(2, 2);
-    frameIGTL[3][2] = 0.0;
-
-    frameIGTL[0][3] = frameCISST.Position().Translation().Element(0);
-    frameIGTL[1][3] = frameCISST.Position().Translation().Element(1);
-    frameIGTL[2][3] = frameCISST.Position().Translation().Element(2);
-    frameIGTL[3][3] = 1.0;
-}
-
-void mtsOpenIGTLinkBridgeData::IGTtoCISST(const igtl::Matrix4x4 & frameIGTL,
-                                          prmPositionCartesianSet & frameCISST)
-{
-    frameCISST.Goal().Rotation().Element(0, 0) = frameIGTL[0][0];
-    frameCISST.Goal().Rotation().Element(1, 0) = frameIGTL[1][0];
-    frameCISST.Goal().Rotation().Element(2, 0) = frameIGTL[2][0];
-
-    frameCISST.Goal().Rotation().Element(0, 1) = frameIGTL[0][1];
-    frameCISST.Goal().Rotation().Element(1, 1) = frameIGTL[1][1];
-    frameCISST.Goal().Rotation().Element(2, 1) = frameIGTL[2][1];
-
-    frameCISST.Goal().Rotation().Element(0, 2) = frameIGTL[0][2];
-    frameCISST.Goal().Rotation().Element(1, 2) = frameIGTL[1][2];
-    frameCISST.Goal().Rotation().Element(2, 2) = frameIGTL[2][2];
-
-    frameCISST.Goal().Translation().Element(0) = frameIGTL[0][3];
-    frameCISST.Goal().Translation().Element(1) = frameIGTL[1][3];
-    frameCISST.Goal().Translation().Element(2) = frameIGTL[2][3];
-}
-
 void mtsOpenIGTLinkBridgeData::ProcessIncomingMessage(mtsOpenIGTLinkBridgeData *bridge,
                                                       igtl::Socket::Pointer socket,
                                                       igtl::MessageHeader::Pointer headerMsg){
@@ -507,7 +458,7 @@ void mtsOpenIGTLinkBridgeData::ProcessIncomingMessage(mtsOpenIGTLinkBridgeData *
         if (c & igtl::MessageHeader::UNPACK_BODY) {
             igtl::Matrix4x4 matrix;
             bridge->TransformMessage->GetMatrix(matrix);
-            IGTtoCISST(matrix,bridge->PositionCartesianSet);
+            mtsIGTLtoCISST(matrix,bridge->PositionCartesianSet);
             igtl::PrintMatrix(matrix);
         }
     }
