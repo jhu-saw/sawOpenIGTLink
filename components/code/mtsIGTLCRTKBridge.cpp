@@ -60,7 +60,8 @@ void mtsIGTLCRTKBridge::ConfigureJSON(const Json::Value & jsonConfig)
     }
 
     std::cerr << CMN_LOG_DETAILS << " need to add option to skip connect" << std::endl;
-    // Connect();
+    mtsComponentManager::GetInstance()->AddComponent(this);
+    Connect();
 }
 
 void mtsIGTLCRTKBridge::BridgeInterfaceProvided(const std::string & componentName,
@@ -134,7 +135,7 @@ void mtsIGTLCRTKBridge::BridgeInterfaceProvided(const std::string & componentNam
         if ((crtkCommand == "measured_cp")
             || (crtkCommand == "setpoint_cp")) {
             AddSenderFromCommandRead<prmPositionCartesianGet, igtl::TransformMessage>
-                (interfaceName, command, nameSpace + '/' + command);
+                (requiredInterfaceName, command, nameSpace + '/' + command);
         }
         /*
         } else if (_crtk_command == "measured_cv") {

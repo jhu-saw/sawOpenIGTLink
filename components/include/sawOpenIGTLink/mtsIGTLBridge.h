@@ -43,7 +43,7 @@ public:
     inline mtsIGTLSenderBase(const std::string & name, mtsIGTLBridge * bridge):
         mName(name), mBridge(bridge) {}
 
-        //! Function used to pull data from the cisst component
+    //! Function used to pull data from the cisst component
     mtsFunctionRead Function;
 
     virtual ~mtsIGTLSenderBase() {};
@@ -71,7 +71,6 @@ protected:
     _cisstType mCISSTData;
     typedef typename _igtlType::Pointer IGTLPointer;
     IGTLPointer mIGTLData;
-    // igtl::TimeStamp mIGTLTimeStamp;
 };
 
 class CISST_EXPORT mtsIGTLBridge: public mtsTaskPeriodic
@@ -94,7 +93,7 @@ class CISST_EXPORT mtsIGTLBridge: public mtsTaskPeriodic
     /*! Must be called after Configure or SetPort. */
     void InitServer(void);
 
-    inline void Configure(const std::string & jsonFile) override;
+    void Configure(const std::string & jsonFile) override;
     virtual void ConfigureJSON(const Json::Value & jsonConfig);
 
     inline void Startup(void) override {};

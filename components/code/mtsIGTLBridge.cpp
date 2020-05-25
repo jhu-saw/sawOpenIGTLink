@@ -136,8 +136,7 @@ void mtsIGTLBridge::Send(igtl::MessageBase & message)
     }
 
     // remove all sockets we identified as inactive
-    for (auto & removedIter : toBeRemoved) {
-        std::cerr << CMN_LOG_DETAILS << " - remove client socket" << std::endl;
-        // mSockets.erase(removedIter);
+    for (auto & socket : toBeRemoved) {
+        mSockets.remove(socket);
     }
 }

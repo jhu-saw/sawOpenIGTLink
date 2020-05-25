@@ -54,10 +54,10 @@ bool mtsCISSTToIGTL(const prmPositionCartesianGet & cisstData,
     igtl::Matrix4x4 dataMatrix;
     mtsCISSTToIGTL(cisstData, dataMatrix);
     igtlData->SetMatrix(dataMatrix);
-    // igtl::TimeStamp::Pointer timeStamp;
-    // igtlData->GetTimeStamp(timeStamp);
-    // timeStamp->SetTime(cisstData.Timestamp());
-    //        bridge->TransformMessage->SetTimeStamp(ts);
+    igtl::TimeStamp::Pointer timeStamp;
+    timeStamp = igtl::TimeStamp::New();
+    timeStamp->SetTime(cisstData.Timestamp());
+    igtlData->SetTimeStamp(timeStamp);
     igtlData->Pack();
     return true;
 }
