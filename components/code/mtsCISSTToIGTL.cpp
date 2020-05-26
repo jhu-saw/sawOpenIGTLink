@@ -52,12 +52,49 @@ bool mtsCISSTToIGTL(const prmPositionCartesianGet & cisstData,
 {
     // there must be a way to convert in-place
     igtl::Matrix4x4 dataMatrix;
-    mtsCISSTToIGTL(cisstData, dataMatrix);
-    igtlData->SetMatrix(dataMatrix);
+    if (mtsCISSTToIGTL(cisstData, dataMatrix)) {
+        igtlData->SetMatrix(dataMatrix);
+        igtl::TimeStamp::Pointer timeStamp;
+        timeStamp = igtl::TimeStamp::New();
+        timeStamp->SetTime(cisstData.Timestamp());
+        igtlData->SetTimeStamp(timeStamp);
+        return true;
+    }
+    return false;
+}
+
+bool mtsCISSTToIGTL(const prmStateJoint & cisstData,
+                    igtl::SensorMessage::Pointer igtlData)
+{
+    if (!cisstData.Valid()) {
+        return false;
+    }
+    igtlData->SetLength(cisstData.Position().size());
+    igtlData->SetValue(const_cast<double *>(cisstData.Position().Pointer()));
     igtl::TimeStamp::Pointer timeStamp;
     timeStamp = igtl::TimeStamp::New();
     timeStamp->SetTime(cisstData.Timestamp());
     igtlData->SetTimeStamp(timeStamp);
-    igtlData->Pack();
+    return true;
+}
+
+bool mtsCISSTToIGTL(const prmEventButton & cisstData,
+                    igtl::SensorMessage::Pointer igtlData)
+{
+    if (!cisstData.Valid()) {
+        return false;
+    }
+    igtlData->SetLength(1);
+    if (cisstData.Type() == prmEventButton::PRESSED) {
+        igtlData->SetValue(0, 1.0);
+    } else if (cisstData.Type() == prmEventButton::RELEASED) {
+        igtlData->SetValue(0, 0.0);
+    } else if (cisstData.Type() == prmEventButton::CLICKED) {
+        igtlData->SetValue(0, 2.0);
+    }
+    igtl::TimeStamp::Pointer timeStamp;
+    timeStamp = igtl::TimeStamp::New();
+    timeStamp->SetTime(cisstData.Timestamp());
+    igtlData->SetTimeStamp(timeStamp);
     return true;
 }

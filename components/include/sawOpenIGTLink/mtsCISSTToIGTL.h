@@ -20,12 +20,21 @@ http://www.cisst.org/cisst/license.txt.
 #define _mtsCISSTToIGTL_h
 
 #include <igtlTransformMessage.h>
+#include <igtlSensorMessage.h>
 #include <cisstParameterTypes/prmPositionCartesianGet.h>
+#include <cisstParameterTypes/prmStateJoint.h>
+#include <cisstParameterTypes/prmEventButton.h>
 
 bool mtsCISSTToIGTL(const prmPositionCartesianGet & cisstData,
                     igtl::Matrix4x4 & igtlData);
 
 bool mtsCISSTToIGTL(const prmPositionCartesianGet & cisstData,
                     igtl::TransformMessage::Pointer igtlData);
+
+bool mtsCISSTToIGTL(const prmStateJoint & cisstData,
+                    igtl::SensorMessage::Pointer igtlData);
+
+bool mtsCISSTToIGTL(const prmEventButton & cisstData,
+                    igtl::SensorMessage::Pointer igtlData);
 
 #endif  // _mtsCISSTToIGTL_h

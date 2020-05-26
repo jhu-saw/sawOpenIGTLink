@@ -61,8 +61,6 @@ class mtsIGTLSender: public mtsIGTLSenderBase
 public:
     inline mtsIGTLSender(const std::string & name, mtsIGTLBridge * bridge):
         mtsIGTLSenderBase(name, bridge) {
-        mIGTLData = _igtlType::New();
-        mIGTLData->SetDeviceName(name);
     }
     inline virtual ~mtsIGTLSender() {}
     bool Execute(void);
@@ -72,6 +70,26 @@ protected:
     typedef typename _igtlType::Pointer IGTLPointer;
     IGTLPointer mIGTLData;
 };
+
+template <typename _cisstType, typename _igtlType>
+class mtsIGTLEventWriteSender: public mtsIGTLSenderBase
+{
+public:
+    inline mtsIGTLEventWriteSender(const std::string & name, mtsIGTLBridge * bridge):
+        mtsIGTLSenderBase(name, bridge) {
+        mIGTLData = _igtlType::New();
+        mIGTLData->SetDeviceName(name);
+    }
+    inline virtual ~mtsIGTLEventWriteSender() {}
+    bool Execute(void) {
+        return true;
+    }
+    void EventHandler(const _cisstType & cisstData);
+protected:
+    typedef typename _igtlType::Pointer IGTLPointer;
+    IGTLPointer mIGTLData;
+};
+
 
 class CISST_EXPORT mtsIGTLBridge: public mtsTaskPeriodic
 {
@@ -105,6 +123,11 @@ class CISST_EXPORT mtsIGTLBridge: public mtsTaskPeriodic
                                   const std::string & functionName,
                                   const std::string & igtlDeviceName);
 
+    template <typename _cisstType, typename _igtlType>
+    bool AddSenderFromEventWrite(const std::string & interfaceRequiredName,
+                                 const std::string & eventName,
+                                 const std::string & igtlDeviceName);
+
     void SendAll(void);
     void Send(igtl::MessageBase & message);
 
@@ -125,7 +148,10 @@ template <typename _cisstType, typename _igtlType>
 bool mtsIGTLSender<_cisstType, _igtlType>::Execute(void) {
     mtsExecutionResult result = Function(mCISSTData);
     if (result) {
+        mIGTLData = _igtlType::New();
+        mIGTLData->SetDeviceName(mName);
         if (mtsCISSTToIGTL(mCISSTData, mIGTLData)) {
+            mIGTLData->Pack();
             mBridge->Send(*mIGTLData);
             return true;
         }
@@ -136,6 +162,15 @@ bool mtsIGTLSender<_cisstType, _igtlType>::Execute(void) {
     return false;
 }
 
+template <typename _cisstType, typename _igtlType>
+void mtsIGTLEventWriteSender<_cisstType, _igtlType>::EventHandler(const _cisstType & cisstData) {
+    mIGTLData = _igtlType::New();
+    mIGTLData->SetDeviceName(mName);
+    if (mtsCISSTToIGTL(cisstData, mIGTLData)) {
+        mIGTLData->Pack();
+        mBridge->Send(*mIGTLData);
+    }
+}
 
 template <typename _cisstType, typename _igtlType>
 bool mtsIGTLBridge::AddSenderFromCommandRead(const std::string & interfaceRequiredName,
@@ -152,15 +187,46 @@ bool mtsIGTLBridge::AddSenderFromCommandRead(const std::string & interfaceRequir
                                  << interfaceRequiredName << "\"" << std::endl;
         return false;
     }
-    mtsIGTLSenderBase * sender =
+    mtsIGTLSenderBase * newSender =
         new mtsIGTLSender<_cisstType, _igtlType>(igtlDeviceName, this);
-    if (!interfaceRequired->AddFunction(functionName, sender->Function)) {
+    if (!interfaceRequired->AddFunction(functionName, newSender->Function)) {
         CMN_LOG_CLASS_INIT_ERROR << "AddSenderFromCommandRead: failed to create function \""
                                  << functionName << "\"" << std::endl;
-        delete sender;
+        delete newSender;
         return false;
     }
-    mSenders.push_back(sender);
+    mSenders.push_back(newSender);
+    return true;
+}
+
+
+template <typename _cisstType, typename _igtlType>
+bool mtsIGTLBridge::AddSenderFromEventWrite(const std::string & interfaceRequiredName,
+                                            const std::string & eventName,
+                                            const std::string & igtlDeviceName) {
+    // check if the interface exists of try to create one
+    mtsInterfaceRequired * interfaceRequired
+        = this->GetInterfaceRequired(interfaceRequiredName);
+    if (!interfaceRequired) {
+        interfaceRequired = this->AddInterfaceRequired(interfaceRequiredName);
+    }
+    if (!interfaceRequired) {
+        CMN_LOG_CLASS_INIT_ERROR << "AddSenderFromEventWrite: failed to create required interface \""
+                                 << interfaceRequiredName << "\"" << std::endl;
+        return false;
+    }
+
+    mtsIGTLEventWriteSender<_cisstType, _igtlType> * newSender
+        = new mtsIGTLEventWriteSender<_cisstType, _igtlType>(igtlDeviceName, this);
+    if (!interfaceRequired->AddEventHandlerWrite(&mtsIGTLEventWriteSender<_cisstType, _igtlType>::EventHandler,
+                                                 newSender, eventName)) {
+        CMN_LOG_CLASS_INIT_ERROR << "AddSenderFromEventWrite: failed to add event \""
+                                 << eventName << "\" required interface \""
+                                 << interfaceRequiredName << "\"" << std::endl;
+        delete newSender;
+        return false;
+    }
+    mSenders.push_back(newSender);
     return true;
 }
 

@@ -32,7 +32,7 @@ class mtsIGTLCRTKBridge: public mtsIGTLBridge
 public:
     inline mtsIGTLCRTKBridge(const std::string & componentName, const double & period):
         mtsIGTLBridge(componentName, period) {}
-    
+
     inline mtsIGTLCRTKBridge(const mtsTaskPeriodicConstructorArg & arg):
         mtsIGTLBridge(arg) {}
 

@@ -89,7 +89,7 @@ void mtsIGTLCRTKBridge::BridgeInterfaceProvided(const std::string & componentNam
     // bridged (e.g. subscribers and events)
     const std::string requiredInterfaceName = componentName + "::" + interfaceName;
     std::string crtkCommand;
-
+    bool connectionNeeded = false;
     /*
     // write commands
     auto names = interfaceProvided->GetNamesOfCommandsWrite();
@@ -125,18 +125,19 @@ void mtsIGTLCRTKBridge::BridgeInterfaceProvided(const std::string & componentNam
     for (auto & command : interfaceProvided->GetNamesOfCommandsRead()) {
         // get the CRTK command so we know which template type to use
         GetCRTKCommand(command, crtkCommand);
-        /*
-        if ((_crtk_command == "measured_js")
-            || (_crtk_command == "setpoint_js")) {
-            _pub_bridge_used = true;
-            _pub_bridge->AddPublisherFromCommandRead<prmStateJoint, sensor_msgs::JointState>
-                (interfaceName, *_command, _ros_topic);
-                } else*/
-        if ((crtkCommand == "measured_cp")
-            || (crtkCommand == "setpoint_cp")) {
+
+        if ((crtkCommand == "measured_js")
+            || (crtkCommand == "setpoint_js")) {
+            connectionNeeded = true;
+            AddSenderFromCommandRead<prmStateJoint, igtl::SensorMessage>
+                (requiredInterfaceName, command, nameSpace + '/' + command);
+        } else if ((crtkCommand == "measured_cp")
+                   || (crtkCommand == "setpoint_cp")) {
+            connectionNeeded = true;
             AddSenderFromCommandRead<prmPositionCartesianGet, igtl::TransformMessage>
                 (requiredInterfaceName, command, nameSpace + '/' + command);
         }
+
         /*
         } else if (_crtk_command == "measured_cv") {
             _pub_bridge_used = true;
@@ -153,12 +154,6 @@ void mtsIGTLCRTKBridge::BridgeInterfaceProvided(const std::string & componentNam
         } else if (_crtk_command == "operating_state") {
             m_subscribers_bridge->AddServiceFromCommandRead<prmOperatingState, crtk_msgs::trigger_operating_state>
                 (_requiredinterfaceName, *_command, _ros_topic);
-        } else if (_crtk_command == "period_statistics") {
-            std::string _namespace = componentName + "_" + interfaceName;
-            std::transform(_namespace.begin(), _namespace.end(), _namespace.begin(), tolower);
-            clean_namespace(_namespace);
-            m_stats_bridge->AddIntervalStatisticsPublisher("stats/" + _namespace,
-                                                           componentName, interfaceName);
         }
         */
     }
@@ -194,7 +189,12 @@ void mtsIGTLCRTKBridge::BridgeInterfaceProvided(const std::string & componentNam
         }
     }
     */
-    
+
+    if (connectionNeeded) {
+        mConnections.Add(this->GetName(), requiredInterfaceName,
+                         componentName, interfaceName);
+    }
+
     // buttons are a pain, they tend to have one interface per button
     // with a single write event called "Button".  By convention, the
     // button interface is using the name of the device it is attached
@@ -202,39 +202,30 @@ void mtsIGTLCRTKBridge::BridgeInterfaceProvided(const std::string & componentNam
     // Falcon00-Left, SensablePhantom left has button leftButton1).
     // So we look at all interfaces on the component that match the
     // interface_name and have an event write called "Button".
-    /*
-    auto _interfaces = component->GetNamesOfInterfacesProvided();
-    const size_t _prefix_size =interfaceName.size();
-    _end = _interfaces.end();
-    for (auto _iter = _interfaces.begin();
-         _iter != _end;
-         ++_iter) {
+    const size_t prefixSize = interfaceName.size();
+    for (auto & buttonInterface : component->GetNamesOfInterfacesProvided()) {
         // can only be a prefix if shorter
-        if (_iter->size() > _prefix_size) {
+        if (buttonInterface.size() > prefixSize) {
             if (std::equal(interfaceName.begin(),
                            interfaceName.end(),
-                           _iter->begin())) {
+                           buttonInterface.begin())) {
                 // remove heading - or _
-                size_t _offset = 0;
-                const char _first_char = _iter->at(_prefix_size);
-                if ((_first_char == '-') || (_first_char == '_')) {
-                    _offset = 1;
+                size_t offset = 0;
+                const char firstChar = buttonInterface.at(prefixSize);
+                if ((firstChar == '-') || (firstChar == '_')) {
+                    offset = 1;
                 }
-                std::string _button_name = _iter->substr(_prefix_size + _offset);
+                std::string buttonName = buttonInterface.substr(prefixSize + offset);
                 // put all to lower case to be more ROS alike
-                std::transform(_button_name.begin(), _button_name.end(), _button_name.begin(), tolower);
+                std::transform(buttonName.begin(), buttonName.end(), buttonName.begin(), tolower);
                 // add and connect interface to event bridge
-                m_events_bridge->AddPublisherFromEventWrite<prmEventButton, sensor_msgs::Joy>
-                    (*_iter, "Button", _clean_namespace + _button_name);
-                m_connections.Add(m_events_bridge->GetName(), *_iter,
-                                  componentName, *_iter);
+                AddSenderFromEventWrite<prmEventButton, igtl::SensorMessage>
+                    (componentName + "::" + buttonInterface, "Button", nameSpace + "/" + buttonName);
+                mConnections.Add(this->GetName(), componentName + "::" + buttonInterface,
+                                 componentName, buttonInterface);
             }
         }
     }
-    */
-
-    mConnections.Add(this->GetName(), requiredInterfaceName,
-                     componentName, interfaceName);
 }
 
 void mtsIGTLCRTKBridge::GetCRTKCommand(const std::string & fullCommand,
