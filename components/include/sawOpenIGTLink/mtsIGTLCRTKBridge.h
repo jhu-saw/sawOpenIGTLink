@@ -20,12 +20,16 @@ http://www.cisst.org/cisst/license.txt.
 #ifndef _mtsIGTLCRTKBridge_h
 #define _mtsIGTLCRTKBridge_h
 
+#include <set>
+
 // cisst include
 #include <sawOpenIGTLink/mtsIGTLBridge.h>
 #include <cisstMultiTask/mtsDelayedConnections.h>
 
+// Always include last!
+#include <sawOpenIGTLink/sawOpenIGTLinkExport.h>
 
-class mtsIGTLCRTKBridge: public mtsIGTLBridge
+class CISST_EXPORT mtsIGTLCRTKBridge: public mtsIGTLBridge
 {
     CMN_DECLARE_SERVICES(CMN_DYNAMIC_CREATION_ONEARG, CMN_LOG_ALLOW_DEFAULT);
 
@@ -54,6 +58,10 @@ protected:
 
     void GetCRTKCommand(const std::string & fullCommand,
                         std::string & crtkCommand);
+
+    //! Explict list of CRTK commands to bridge
+    std::set<std::string> mBridgeOnly;
+    bool ShouldBeBridged(const std::string & command);
 };
 
 CMN_DECLARE_SERVICES_INSTANTIATION(mtsIGTLCRTKBridge);

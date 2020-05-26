@@ -42,26 +42,40 @@ void mtsIGTLCRTKBridge::ConfigureJSON(const Json::Value & jsonConfig)
             CMN_LOG_CLASS_INIT_ERROR << "ConfigureJSON: all \"interfaces\" must define \"component\"" << std::endl;
             return;
         }
+        // future implementation could also support interface-required
         std::string componentName = jsonValue.asString();
-        jsonValue = interfaces[index]["interface"];
+        jsonValue = interfaces[index]["interface-provided"];
         if (jsonValue.empty()) {
-            CMN_LOG_CLASS_INIT_ERROR << "ConfigureJSON: all \"interfaces\" must define \"interface\"" << std::endl;
+            CMN_LOG_CLASS_INIT_ERROR << "ConfigureJSON: all \"interfaces\" must define \"interface-provided\"" << std::endl;
             return;
         }
         std::string interfaceName = jsonValue.asString();
-        jsonValue = interfaces[index]["name"];
+        jsonValue = interfaces[index]["namespace"];
         if (jsonValue.empty()) {
-            CMN_LOG_CLASS_INIT_ERROR << "ConfigureJSON: all \"interfaces\" must define \"name\"" << std::endl;
+            CMN_LOG_CLASS_INIT_ERROR << "ConfigureJSON: all \"interfaces\" must define \"namespace\"" << std::endl;
             return;
         }
         std::string name = jsonValue.asString();
+
+        // if set, only bridge CRTK commands that matches user provided list
+        const Json::Value bridgeOnly = interfaces[index]["bridge-only"];
+        for (unsigned int bo = 0; bo < bridgeOnly.size(); ++bo) {
+            mBridgeOnly.insert(bridgeOnly[bo].asString());
+        }
+
         // and now add the bridge
         BridgeInterfaceProvided(componentName, interfaceName, name);
     }
 
-    std::cerr << CMN_LOG_DETAILS << " need to add option to skip connect" << std::endl;
-    mtsComponentManager::GetInstance()->AddComponent(this);
-    Connect();
+    // skip connecting interfaces in case users want to add more
+    // commands/functions/events to bridge before connecting
+    jsonValue = jsonConfig["skip-connect"];
+    if (!jsonValue.empty() && jsonValue.asBool()) {
+        CMN_LOG_CLASS_INIT_WARNING << "ConfigureJSON: \"skip-connect\" set to \"true\", user is responsible for connecting components" <<  std::endl;
+    } else {
+        mtsComponentManager::GetInstance()->AddComponent(this);
+        Connect();
+    }
 }
 
 void mtsIGTLCRTKBridge::BridgeInterfaceProvided(const std::string & componentName,
@@ -123,39 +137,38 @@ void mtsIGTLCRTKBridge::BridgeInterfaceProvided(const std::string & componentNam
 
     // read commands
     for (auto & command : interfaceProvided->GetNamesOfCommandsRead()) {
-        // get the CRTK command so we know which template type to use
-        GetCRTKCommand(command, crtkCommand);
+        if (ShouldBeBridged(command)) {
+            // get the CRTK command so we know which template type to use
+            GetCRTKCommand(command, crtkCommand);
 
-        if ((crtkCommand == "measured_js")
-            || (crtkCommand == "setpoint_js")) {
-            connectionNeeded = true;
-            AddSenderFromCommandRead<prmStateJoint, igtl::SensorMessage>
-                (requiredInterfaceName, command, nameSpace + '/' + command);
-        } else if ((crtkCommand == "measured_cp")
-                   || (crtkCommand == "setpoint_cp")) {
-            connectionNeeded = true;
-            AddSenderFromCommandRead<prmPositionCartesianGet, igtl::TransformMessage>
-                (requiredInterfaceName, command, nameSpace + '/' + command);
+            if ((crtkCommand == "measured_js")
+                || (crtkCommand == "setpoint_js")) {
+                connectionNeeded = true;
+                AddSenderFromCommandRead<prmStateJoint, igtl::SensorMessage>
+                    (requiredInterfaceName, command, nameSpace + '/' + command);
+            } else if ((crtkCommand == "measured_cp")
+                       || (crtkCommand == "setpoint_cp")) {
+                connectionNeeded = true;
+                AddSenderFromCommandRead<prmPositionCartesianGet, igtl::TransformMessage>
+                    (requiredInterfaceName, command, nameSpace + '/' + command);
+            } else if (crtkCommand == "measured_cv") {
+                connectionNeeded = true;
+                AddSenderFromCommandRead<prmVelocityCartesianGet, igtl::SensorMessage>
+                    (requiredInterfaceName, command, nameSpace + '/' + command);
+            } else if (crtkCommand == "measured_cf") {
+                connectionNeeded = true;
+                AddSenderFromCommandRead<prmForceCartesianGet, igtl::SensorMessage>
+                    (requiredInterfaceName, command, nameSpace + '/' + command);
+            } /* else if (_crtk_command == "jacobian") {
+                 _pub_bridge_used = true;
+                 _pub_bridge->AddPublisherFromCommandRead<vctDoubleMat, std_msgs::Float64MultiArray>
+                 (interfaceName, *_command, _ros_topic);
+                 } else if (_crtk_command == "operating_state") {
+                 m_subscribers_bridge->AddServiceFromCommandRead<prmOperatingState, crtk_msgs::trigger_operating_state>
+                 (_requiredinterfaceName, *_command, _ros_topic);
+                 }
+              */
         }
-
-        /*
-        } else if (_crtk_command == "measured_cv") {
-            _pub_bridge_used = true;
-            _pub_bridge->AddPublisherFromCommandRead<prmVelocityCartesianGet, geometry_msgs::TwistStamped>
-                (interfaceName, *_command, _ros_topic);
-        } else if (_crtk_command == "measured_cf") {
-            _pub_bridge_used = true;
-            _pub_bridge->AddPublisherFromCommandRead<prmForceCartesianGet, geometry_msgs::WrenchStamped>
-                (interfaceName, *_command, _ros_topic);
-        } else if (_crtk_command == "jacobian") {
-            _pub_bridge_used = true;
-            _pub_bridge->AddPublisherFromCommandRead<vctDoubleMat, std_msgs::Float64MultiArray>
-                (interfaceName, *_command, _ros_topic);
-        } else if (_crtk_command == "operating_state") {
-            m_subscribers_bridge->AddServiceFromCommandRead<prmOperatingState, crtk_msgs::trigger_operating_state>
-                (_requiredinterfaceName, *_command, _ros_topic);
-        }
-        */
     }
 
     // write events
@@ -237,4 +250,15 @@ void mtsIGTLCRTKBridge::GetCRTKCommand(const std::string & fullCommand,
     } else {
         crtkCommand = fullCommand.substr(pos + 1);
     }
+}
+
+bool mtsIGTLCRTKBridge::ShouldBeBridged(const std::string & command)
+{
+    if (mBridgeOnly.empty()) {
+        return true;
+    }
+    if (mBridgeOnly.find(command) != mBridgeOnly.end()) {
+        return true;
+    }
+    return false;
 }

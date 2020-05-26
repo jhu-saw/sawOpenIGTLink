@@ -63,6 +63,41 @@ bool mtsCISSTToIGTL(const prmPositionCartesianGet & cisstData,
     return false;
 }
 
+bool mtsCISSTToIGTL(const prmVelocityCartesianGet & cisstData,
+                    igtl::SensorMessage::Pointer igtlData)
+{
+    if (!cisstData.Valid()) {
+        return false;
+    }
+    igtlData->SetLength(6);
+    igtlData->SetValue(0, cisstData.VelocityLinear().Element(0));
+    igtlData->SetValue(1, cisstData.VelocityLinear().Element(1));
+    igtlData->SetValue(2, cisstData.VelocityLinear().Element(2));
+    igtlData->SetValue(3, cisstData.VelocityAngular().Element(0));
+    igtlData->SetValue(4, cisstData.VelocityAngular().Element(1));
+    igtlData->SetValue(5, cisstData.VelocityAngular().Element(2));
+    igtl::TimeStamp::Pointer timeStamp;
+    timeStamp = igtl::TimeStamp::New();
+    timeStamp->SetTime(cisstData.Timestamp());
+    igtlData->SetTimeStamp(timeStamp);
+    return true;
+}
+
+bool mtsCISSTToIGTL(const prmForceCartesianGet & cisstData,
+                    igtl::SensorMessage::Pointer igtlData)
+{
+    if (!cisstData.Valid()) {
+        return false;
+    }
+    igtlData->SetLength(6);
+    igtlData->SetValue(const_cast<double *>(cisstData.Force().Pointer()));
+    igtl::TimeStamp::Pointer timeStamp;
+    timeStamp = igtl::TimeStamp::New();
+    timeStamp->SetTime(cisstData.Timestamp());
+    igtlData->SetTimeStamp(timeStamp);
+    return true;
+}
+
 bool mtsCISSTToIGTL(const prmStateJoint & cisstData,
                     igtl::SensorMessage::Pointer igtlData)
 {
