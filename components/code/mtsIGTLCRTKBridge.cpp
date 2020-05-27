@@ -172,36 +172,24 @@ void mtsIGTLCRTKBridge::BridgeInterfaceProvided(const std::string & componentNam
     }
 
     // write events
-    /*
-    names = interfaceProvided->GetNamesOfEventsWrite();
-    _end = names.end();
-    for (auto _event = names.begin();
-         _event != _end;
-         ++_event) {
-        // get the CRTK command so we know which template type to use
-        get_crtk_command(*_event, _crtk_command);
-        _ros_topic = _clean_namespace + *_event;
-        if (_crtk_command == "operating_state") {
-            m_events_bridge->AddPublisherFromEventWrite<prmOperatingState, crtk_msgs::operating_state>
-                (_requiredinterfaceName, *_event, _ros_topic);
-        } else if (_crtk_command == "error") {
-            m_events_bridge->AddPublisherFromEventWrite<mtsMessage, std_msgs::String>
-                (_requiredinterfaceName, *_event, _ros_topic);
-            m_events_bridge->AddLogFromEventWrite(_requiredinterfaceName + "-ros-log", *_event,
-                                                  mtsROSEventWriteLog::ROS_LOG_ERROR);
-        } else if (_crtk_command == "warning") {
-            m_events_bridge->AddPublisherFromEventWrite<mtsMessage, std_msgs::String>
-                (_requiredinterfaceName, *_event, _ros_topic);
-            m_events_bridge->AddLogFromEventWrite(_requiredinterfaceName + "-ros-log", *_event,
-                                                  mtsROSEventWriteLog::ROS_LOG_WARN);
-        } else if (_crtk_command == "status") {
-            m_events_bridge->AddPublisherFromEventWrite<mtsMessage, std_msgs::String>
-                (_requiredinterfaceName, *_event, _ros_topic);
-            m_events_bridge->AddLogFromEventWrite(_requiredinterfaceName + "-ros-log", *_event,
-                                                  mtsROSEventWriteLog::ROS_LOG_INFO);
+    for (auto & command : interfaceProvided->GetNamesOfEventsWrite()) {
+        if (ShouldBeBridged(command)) {
+            // get the CRTK command so we know which template type to use
+            GetCRTKCommand(command, crtkCommand);
+            /*
+              if (_crtk_command == "operating_state") {
+              m_events_bridge->AddPublisherFromEventWrite<prmOperatingState, crtk_msgs::operating_state>
+              (_requiredinterfaceName, *_event, _ros_topic);
+              } else */
+            if ((crtkCommand == "error")
+                || (crtkCommand == "warning")
+                || (crtkCommand == "status")) {
+                connectionNeeded = true;
+                AddSenderFromEventWrite<mtsMessage, igtl::StringMessage>
+                    (requiredInterfaceName, command, nameSpace + '/' + command);
+            }
         }
     }
-    */
 
     if (connectionNeeded) {
         mConnections.Add(this->GetName(), requiredInterfaceName,

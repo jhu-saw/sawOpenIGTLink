@@ -18,6 +18,24 @@ http://www.cisst.org/cisst/license.txt.
 
 #include <sawOpenIGTLink/mtsCISSTToIGTL.h>
 
+bool mtsCISSTToIGTL(const std::string & cisstData,
+                    igtl::StringMessage::Pointer igtlData)
+{
+    igtlData->SetString(cisstData);
+    return true;
+}
+
+bool mtsCISSTToIGTL(const mtsMessage & cisstData,
+                    igtl::StringMessage::Pointer igtlData)
+{
+    igtlData->SetString(cisstData.Message);
+    igtl::TimeStamp::Pointer timeStamp;
+    timeStamp = igtl::TimeStamp::New();
+    timeStamp->SetTime(cisstData.Timestamp);
+    igtlData->SetTimeStamp(timeStamp);
+    return true;
+}
+
 bool mtsCISSTToIGTL(const prmPositionCartesianGet & cisstData,
                     igtl::Matrix4x4 & igtlData)
 {
