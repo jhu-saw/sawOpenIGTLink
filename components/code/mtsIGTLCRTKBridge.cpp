@@ -210,20 +210,26 @@ void mtsIGTLCRTKBridge::BridgeInterfaceProvided(const std::string & componentNam
             if (std::equal(interfaceName.begin(),
                            interfaceName.end(),
                            buttonInterface.begin())) {
-                // remove heading - or _
-                size_t offset = 0;
-                const char firstChar = buttonInterface.at(prefixSize);
-                if ((firstChar == '-') || (firstChar == '_')) {
-                    offset = 1;
+                // this interface qualifies based on the name, does it
+                // contain an event write "Button"?
+                auto interfaceCandidate = component->GetInterfaceProvided(buttonInterface);
+                auto events = interfaceCandidate->GetNamesOfEventsWrite();
+                if (std::find(events.begin(), events.end(), "Button") != events.end()) {
+                    // remove heading - or _
+                    size_t offset = 0;
+                    const char firstChar = buttonInterface.at(prefixSize);
+                    if ((firstChar == '-') || (firstChar == '_')) {
+                        offset = 1;
+                    }
+                    std::string buttonName = buttonInterface.substr(prefixSize + offset);
+                    // put all to lower case to be more ROS alike
+                    std::transform(buttonName.begin(), buttonName.end(), buttonName.begin(), tolower);
+                    // add and connect interface to event bridge
+                    AddSenderFromEventWrite<prmEventButton, igtl::SensorMessage>
+                        (componentName + "::" + buttonInterface, "Button", nameSpace + "/" + buttonName);
+                    mConnections.Add(this->GetName(), componentName + "::" + buttonInterface,
+                                     componentName, buttonInterface);
                 }
-                std::string buttonName = buttonInterface.substr(prefixSize + offset);
-                // put all to lower case to be more ROS alike
-                std::transform(buttonName.begin(), buttonName.end(), buttonName.begin(), tolower);
-                // add and connect interface to event bridge
-                AddSenderFromEventWrite<prmEventButton, igtl::SensorMessage>
-                    (componentName + "::" + buttonInterface, "Button", nameSpace + "/" + buttonName);
-                mConnections.Add(this->GetName(), componentName + "::" + buttonInterface,
-                                 componentName, buttonInterface);
             }
         }
     }
