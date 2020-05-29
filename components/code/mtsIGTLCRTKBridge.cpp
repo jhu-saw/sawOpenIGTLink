@@ -50,12 +50,15 @@ void mtsIGTLCRTKBridge::ConfigureJSON(const Json::Value & jsonConfig)
             return;
         }
         std::string interfaceName = jsonValue.asString();
+
+        // namespace is optional, use interface name by default
         jsonValue = interfaces[index]["namespace"];
-        if (jsonValue.empty()) {
-            CMN_LOG_CLASS_INIT_ERROR << "ConfigureJSON: all \"interfaces\" must define \"namespace\"" << std::endl;
-            return;
-        }
-        std::string name = jsonValue.asString();
+        std::string name;
+        if (!jsonValue.empty()) {
+            name = jsonValue.asString();
+        } else {
+            name = interfaceName;
+        }   
 
         // if set, only bridge CRTK commands that matches user provided list
         const Json::Value bridgeOnly = interfaces[index]["bridge-only"];
