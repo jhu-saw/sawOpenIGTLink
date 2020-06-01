@@ -18,12 +18,29 @@ http://www.cisst.org/cisst/license.txt.
 
 #include <sawOpenIGTLink/mtsIGTLBridge.h>
 
+#include <igtlServerSocket.h>
+#include <igtlTimeStamp.h>
+#include <igtlMessageBase.h>
+
 CMN_IMPLEMENT_SERVICES_DERIVED_ONEARG(mtsIGTLBridge, mtsTaskPeriodic, mtsTaskPeriodicConstructorArg);
+
+class mtsIGTLBridgeData {
+public:
+    igtl::ServerSocket::Pointer mServerSocket;
+    typedef std::list<igtl::ClientSocket::Pointer> SocketsType;
+    SocketsType mSockets;
+};
+
+void mtsIGTLBridge::Init(void)
+{
+    CMN_ASSERT(mData == nullptr);
+    mData = new mtsIGTLBridgeData();
+}
 
 void mtsIGTLBridge::InitServer(void)
 {
-    mServerSocket = igtl::ServerSocket::New();
-    const int result = mServerSocket->CreateServer(mPort);
+    mData->mServerSocket = igtl::ServerSocket::New();
+    const int result = mData->mServerSocket->CreateServer(mPort);
     if (result < 0) {
         CMN_LOG_CLASS_INIT_ERROR << "mtsIGTLBridge: can't create server socket on port "
                                  << mPort << std::endl;
@@ -60,16 +77,23 @@ void mtsIGTLBridge::ConfigureJSON(const Json::Value & jsonConfig)
     }
 }
 
+void mtsIGTLBridge::Startup(void)
+{
+    if (mPort == 0) {
+        SetPort(18944);
+    }
+}
+
 void mtsIGTLBridge::Cleanup(void)
 {
     CMN_LOG_CLASS_INIT_VERBOSE << "Cleanup: closing hanging connections" << std::endl;
-    mServerSocket->CloseSocket();
+    mData->mServerSocket->CloseSocket();
     // iterate on all sockets
-    for (auto & socket : mSockets) {
+    for (auto & socket : mData->mSockets) {
         socket->CloseSocket();
         socket->Delete();
     }
-    mServerSocket->Delete();
+    mData->mServerSocket->Delete();
 }
 
 void mtsIGTLBridge::Run(void)
@@ -78,7 +102,7 @@ void mtsIGTLBridge::Run(void)
     ProcessQueuedEvents();
 
     // first see if we have any new client
-    igtl::ClientSocket::Pointer newSocket = mServerSocket->WaitForConnection(1);
+    igtl::ClientSocket::Pointer newSocket = mData->mServerSocket->WaitForConnection(1);
     if (newSocket.IsNotNull()) {
         // log some information and add to list
         std::string address;
@@ -90,17 +114,20 @@ void mtsIGTLBridge::Run(void)
         newSocket->SetTimeout(10);
         newSocket->SetSendBlocking(10);
         // add new socket to the list
-        mSockets.push_back(newSocket);
+        mData->mSockets.push_back(newSocket);
     }
 
     // update all senders
     SendAll();
+
+    // update all receivers
+    ReceiveAll();
 }
 
 void mtsIGTLBridge::SendAll(void)
 {
     // get data if we have any socket
-    if (mSockets.empty()) {
+    if (mData->mSockets.empty()) {
         return;
     }
 
@@ -109,19 +136,62 @@ void mtsIGTLBridge::SendAll(void)
     }
 }
 
-void mtsIGTLBridge::Send(igtl::MessageBase & message)
+void mtsIGTLBridge::ReceiveAll(void)
 {
     typedef std::list<igtl::ClientSocket::Pointer> RemovedType;
     RemovedType toBeRemoved;
 
     // send to all clients of this server
-    for (auto & socket : mSockets) {
+    for (auto & socket : mData->mSockets) {
+        igtl::MessageHeader::Pointer headerMsg;
+        headerMsg = igtl::MessageHeader::New();
+
+        // keep track of which client we can send to
+        headerMsg->InitPack();
+        int sendingClientActive =
+            socket->Receive(headerMsg->GetPackPointer(),
+                            headerMsg->GetPackSize());
+        headerMsg->Unpack();
+
+        // process message if valid
+        if (sendingClientActive >= 1 && sendingClientActive == headerMsg->GetPackSize()) {
+            std::cerr << "Received from device: " << headerMsg->GetDeviceName() << std::endl;
+        }
+
+        if (sendingClientActive == 0) {
+            // log some information and remove from list
+            std::string address;
+            int port;
+            socket->GetSocketAddressAndPort(address, port);
+            CMN_LOG_CLASS_RUN_VERBOSE << "Can't send to client at "
+                                      << address << ":" << port
+                                      << std::endl;
+            toBeRemoved.push_back(socket);
+        }
+    }
+
+    // remove all sockets we identified as inactive
+    for (auto & socket : toBeRemoved) {
+        mData->mSockets.remove(socket);
+    }
+
+}
+
+// templated implementation for Send
+template <typename _igtlMessagePointer>
+void mtsIGTLBridge::Send(_igtlMessagePointer message)
+{
+    typedef std::list<igtl::ClientSocket::Pointer> RemovedType;
+    RemovedType toBeRemoved;
+
+    // send to all clients of this server
+    for (auto & socket : mData->mSockets) {
         socket->SetTimeout(10);
         socket->SetSendBlocking(10);
         // keep track of which client we can send to
         int receivingClientActive =
-            socket->Send(message.GetPackPointer(),
-                         message.GetPackSize());
+            socket->Send(message->GetPackPointer(),
+                         message->GetPackSize());
 
         if (receivingClientActive == 0) {
             // log some information and remove from list
@@ -137,6 +207,19 @@ void mtsIGTLBridge::Send(igtl::MessageBase & message)
 
     // remove all sockets we identified as inactive
     for (auto & socket : toBeRemoved) {
-        mSockets.remove(socket);
+        mData->mSockets.remove(socket);
     }
 }
+
+// force instantiation
+#include <igtlTransformMessage.h>
+template
+void mtsIGTLBridge::Send<igtl::TransformMessage::Pointer>(igtl::TransformMessage::Pointer message);
+
+#include <igtlStringMessage.h>
+template
+void mtsIGTLBridge::Send<igtl::StringMessage::Pointer>(igtl::StringMessage::Pointer message);
+
+#include <igtlSensorMessage.h>
+template
+void mtsIGTLBridge::Send<igtl::SensorMessage::Pointer>(igtl::SensorMessage::Pointer message);

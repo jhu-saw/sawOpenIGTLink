@@ -28,14 +28,11 @@ http://www.cisst.org/cisst/license.txt.
 #include <cisstMultiTask/mtsTaskPeriodic.h>
 #include <cisstMultiTask/mtsInterfaceRequired.h>
 
-#include <igtlServerSocket.h>
-#include <igtlTimeStamp.h>
-#include <igtlMessageBase.h>
-
 // Always include last!
 #include <sawOpenIGTLink/sawOpenIGTLinkExport.h>
 
 class mtsIGTLBridge;
+class mtsIGTLBridgeData;
 
 class mtsIGTLSenderBase
 {
@@ -99,44 +96,58 @@ class CISST_EXPORT mtsIGTLBridge: public mtsTaskPeriodic
     /*! Constructors */
     inline mtsIGTLBridge(const std::string & componentName, const double & period):
         mtsTaskPeriodic(componentName, period, false, 500) {
+        Init();
     }
 
     inline mtsIGTLBridge(const mtsTaskPeriodicConstructorArg & arg):
         mtsTaskPeriodic(arg) {
+        Init();
     }
 
     /*! Destructor */
-    inline ~mtsIGTLBridge(void) {};
+    inline ~mtsIGTLBridge(void) {}
+
+ protected:
+    /*! Must be called in all constructors */
+    void Init(void);
 
     /*! Must be called after Configure or SetPort. */
     void InitServer(void);
 
+ public:
+    inline void SetPort(const int port) {
+        mPort = port;
+        InitServer();
+    }
+
     void Configure(const std::string & jsonFile) override;
     virtual void ConfigureJSON(const Json::Value & jsonConfig);
 
-    inline void Startup(void) override {};
+    void Startup(void) override;
     void Run(void) override;
     void Cleanup(void) override;
 
     template <typename _cisstType, typename _igtlType>
-    bool AddSenderFromCommandRead(const std::string & interfaceRequiredName,
-                                  const std::string & functionName,
-                                  const std::string & igtlDeviceName);
+        bool AddSenderFromCommandRead(const std::string & interfaceRequiredName,
+                                      const std::string & functionName,
+                                      const std::string & igtlDeviceName);
 
     template <typename _cisstType, typename _igtlType>
-    bool AddSenderFromEventWrite(const std::string & interfaceRequiredName,
-                                 const std::string & eventName,
-                                 const std::string & igtlDeviceName);
+        bool AddSenderFromEventWrite(const std::string & interfaceRequiredName,
+                                     const std::string & eventName,
+                                     const std::string & igtlDeviceName);
 
     void SendAll(void);
-    void Send(igtl::MessageBase & message);
+
+    template <typename _igtlMessagePointer>
+        void Send(_igtlMessagePointer message);
+
+    void ReceiveAll(void);
 
  protected:
     // igtl networking
-    int mPort = 18944; // default
-    igtl::ServerSocket::Pointer mServerSocket;
-    typedef std::list<igtl::ClientSocket::Pointer> SocketsType;
-    SocketsType mSockets;
+    int mPort = 0; // default
+    mtsIGTLBridgeData * mData = nullptr;
 
     // cisst interfaces
     typedef std::list<mtsIGTLSenderBase *> SendersType;
@@ -152,7 +163,7 @@ bool mtsIGTLSender<_cisstType, _igtlType>::Execute(void) {
         mIGTLData->SetDeviceName(mName);
         if (mtsCISSTToIGTL(mCISSTData, mIGTLData)) {
             mIGTLData->Pack();
-            mBridge->Send(*mIGTLData);
+            mBridge->Send(mIGTLData);
             return true;
         }
     } else {
@@ -168,7 +179,7 @@ void mtsIGTLEventWriteSender<_cisstType, _igtlType>::EventHandler(const _cisstTy
     mIGTLData->SetDeviceName(mName);
     if (mtsCISSTToIGTL(cisstData, mIGTLData)) {
         mIGTLData->Pack();
-        mBridge->Send(*mIGTLData);
+        mBridge->Send(mIGTLData);
     }
 }
 
