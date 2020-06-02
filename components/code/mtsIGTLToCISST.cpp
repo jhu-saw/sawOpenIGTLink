@@ -49,23 +49,26 @@ bool mtsIGTLToCISST(const igtl::TransformMessage::Pointer igtlData,
                     prmPositionCartesianSet & cisstData)
 {
     std::cerr << CMN_LOG_DETAILS << " needs to be implemented" << std::endl;
+    return false;
 }
 
 bool mtsIGTLToCISST(const igtl::SensorMessage::Pointer igtlData,
                     prmForceCartesianSet & cisstData)
 {
-    const size_t length = igtlData->GetLength();
+    const unsigned int length = igtlData->GetLength();
     std::cerr << length << std::endl;
     if (length != 6) {
         return false;
     }
-    for (size_t index = 0; index < length; ++index) {
+    for (unsigned int index = 0; index < length; ++index) {
         cisstData.Force().Element(index) = igtlData->GetValue(index);
     }
+    return true;
 }
 
 bool mtsIGTLToCISST(const igtl::SensorMessage::Pointer igtlData,
                     prmStateJoint & cisstData)
 {
     std::cerr << CMN_LOG_DETAILS << " needs to be implemented" << std::endl;
+    return false;
 }
