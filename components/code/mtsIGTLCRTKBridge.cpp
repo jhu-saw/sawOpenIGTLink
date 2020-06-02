@@ -58,7 +58,7 @@ void mtsIGTLCRTKBridge::ConfigureJSON(const Json::Value & jsonConfig)
             name = jsonValue.asString();
         } else {
             name = interfaceName;
-        }   
+        }
 
         // if set, only bridge CRTK commands that matches user provided list
         const Json::Value bridgeOnly = interfaces[index]["bridge-only"];
@@ -107,36 +107,41 @@ void mtsIGTLCRTKBridge::BridgeInterfaceProvided(const std::string & componentNam
     const std::string requiredInterfaceName = componentName + "::" + interfaceName;
     std::string crtkCommand;
     bool connectionNeeded = false;
-    /*
+
     // write commands
-    auto names = interfaceProvided->GetNamesOfCommandsWrite();
-    auto _end = names.end();
-    for (auto _command = names.begin();
-         _command != _end;
-         ++_command) {
-        // get the CRTK command so we know which template type to use
-        get_crtk_command(*_command, _crtk_command);
-        _ros_topic = _clean_namespace + *_command;
-        if ((_crtk_command == "servo_jp")
-            || (_crtk_command == "move_jp")) {
-            m_subscribers_bridge->AddSubscriberToCommandWrite<prmPositionJointSet, sensor_msgs::JointState>
-                (_requiredinterfaceName, *_command, _ros_topic);
-        } else  if (_crtk_command == "servo_jf") {
-            m_subscribers_bridge->AddSubscriberToCommandWrite<prmForceTorqueJointSet, sensor_msgs::JointState>
-                (_requiredinterfaceName, *_command, _ros_topic);
-        } else if ((_crtk_command == "servo_cp")
-                   || (_crtk_command == "move_cp")) {
-            m_subscribers_bridge->AddSubscriberToCommandWrite<prmPositionCartesianSet, geometry_msgs::TransformStamped>
-                (_requiredinterfaceName, *_command, _ros_topic);
-        } else if (_crtk_command == "servo_cf") {
-            m_subscribers_bridge->AddSubscriberToCommandWrite<prmForceCartesianSet, geometry_msgs::WrenchStamped>
-                (_requiredinterfaceName, *_command, _ros_topic);
-        } else if (_crtk_command == "state_command") {
-            m_subscribers_bridge->AddSubscriberToCommandWrite<std::string, crtk_msgs::StringStamped>
-                (_requiredinterfaceName, *_command, _ros_topic);
+    for (auto & command : interfaceProvided->GetNamesOfCommandsWrite()) {
+        if (ShouldBeBridged(command)) {
+            // get the CRTK command so we know which template type to use
+            GetCRTKCommand(command, crtkCommand);
+
+        /*
+          if ((_crtk_command == "servo_jp")
+          || (_crtk_command == "move_jp")) {
+          connectionNeeded = true;
+          m_subscribers_bridge->AddSubscriberToCommandWrite<prmPositionJointSet, sensor_msgs::JointState>
+          (_requiredinterfaceName, *_command, _ros_topic);
+          } else  if (_crtk_command == "servo_jf") {
+          connectionNeeded = true;
+          m_subscribers_bridge->AddSubscriberToCommandWrite<prmForceTorqueJointSet, sensor_msgs::JointState>
+          (_requiredinterfaceName, *_command, _ros_topic);
+          } else if ((_crtk_command == "servo_cp")
+          || (_crtk_command == "move_cp")) {
+          connectionNeeded = true;
+          m_subscribers_bridge->AddSubscriberToCommandWrite<prmPositionCartesianSet, geometry_msgs::TransformStamped>
+          (_requiredinterfaceName, *_command, _ros_topic);
+          } else
+        */
+            if (crtkCommand == "servo_cf") {
+                connectionNeeded = true;
+                AddReceiverToCommandWrite<igtl::SensorMessage, prmForceCartesianSet>
+                    (requiredInterfaceName, command, nameSpace + '/' + command);
+            } else if (crtkCommand == "state_command") {
+                connectionNeeded = true;
+                AddReceiverToCommandWrite<igtl::StringMessage, std::string>
+                    (requiredInterfaceName, command, nameSpace + '/' + command);
+            }
         }
     }
-    */
 
     // read commands
     for (auto & command : interfaceProvided->GetNamesOfCommandsRead()) {

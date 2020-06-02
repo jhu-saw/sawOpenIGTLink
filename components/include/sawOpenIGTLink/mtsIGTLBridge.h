@@ -25,6 +25,8 @@ http://www.cisst.org/cisst/license.txt.
 #ifndef _mtsIGTLBridge_h
 #define _mtsIGTLBridge_h
 
+#include <map>
+
 #include <cisstMultiTask/mtsTaskPeriodic.h>
 #include <cisstMultiTask/mtsInterfaceRequired.h>
 
@@ -33,6 +35,11 @@ http://www.cisst.org/cisst/license.txt.
 
 class mtsIGTLBridge;
 class mtsIGTLBridgeData;
+
+namespace igtl {
+    class MessageBase;
+    class Socket;
+}
 
 class mtsIGTLSenderBase
 {
@@ -60,7 +67,7 @@ public:
         mtsIGTLSenderBase(name, bridge) {
     }
     inline virtual ~mtsIGTLSender() {}
-    bool Execute(void);
+    bool Execute(void) override;
 
 protected:
     _cisstType mCISSTData;
@@ -78,13 +85,47 @@ public:
         mIGTLData->SetDeviceName(name);
     }
     inline virtual ~mtsIGTLEventWriteSender() {}
-    bool Execute(void) {
+    bool Execute(void) override {
         return true;
     }
     void EventHandler(const _cisstType & cisstData);
 protected:
     typedef typename _igtlType::Pointer IGTLPointer;
     IGTLPointer mIGTLData;
+};
+
+
+class mtsIGTLReceiverBase
+{
+public:
+    inline mtsIGTLReceiverBase(const std::string & name, mtsIGTLBridge * bridge):
+        mName(name), mBridge(bridge) {}
+
+    //! Function used to pull data from the cisst component
+    mtsFunctionWrite Function;
+
+    virtual ~mtsIGTLReceiverBase() {};
+
+    virtual bool Execute(igtl::Socket * socket, igtl::MessageBase * header) = 0;
+
+protected:
+    std::string mName;
+    mtsIGTLBridge * mBridge;
+};
+
+template <typename _igtlType, typename _cisstType>
+class mtsIGTLReceiver: public mtsIGTLReceiverBase
+{
+public:
+    inline mtsIGTLReceiver(const std::string & name, mtsIGTLBridge * bridge):
+        mtsIGTLReceiverBase(name, bridge) {
+    }
+    inline virtual ~mtsIGTLReceiver() {}
+    bool Execute(igtl::Socket * socket, igtl::MessageBase * header) override;
+
+protected:
+    typedef typename _igtlType::Pointer IGTLPointer;
+    _cisstType mCISSTData;
 };
 
 
@@ -128,19 +169,24 @@ class CISST_EXPORT mtsIGTLBridge: public mtsTaskPeriodic
     void Cleanup(void) override;
 
     template <typename _cisstType, typename _igtlType>
-        bool AddSenderFromCommandRead(const std::string & interfaceRequiredName,
-                                      const std::string & functionName,
-                                      const std::string & igtlDeviceName);
+    bool AddSenderFromCommandRead(const std::string & interfaceRequiredName,
+                                  const std::string & functionName,
+                                  const std::string & igtlDeviceName);
 
     template <typename _cisstType, typename _igtlType>
-        bool AddSenderFromEventWrite(const std::string & interfaceRequiredName,
-                                     const std::string & eventName,
-                                     const std::string & igtlDeviceName);
+    bool AddSenderFromEventWrite(const std::string & interfaceRequiredName,
+                                 const std::string & eventName,
+                                 const std::string & igtlDeviceName);
+
+    template <typename _igtlType, typename _cisstType>
+    bool AddReceiverToCommandWrite(const std::string & interfaceRequiredName,
+                                   const std::string & commandName,
+                                   const std::string & igtlDeviceName);
 
     void SendAll(void);
 
     template <typename _igtlMessagePointer>
-        void Send(_igtlMessagePointer message);
+    void Send(_igtlMessagePointer message);
 
     void ReceiveAll(void);
 
@@ -152,11 +198,15 @@ class CISST_EXPORT mtsIGTLBridge: public mtsTaskPeriodic
     // cisst interfaces
     typedef std::list<mtsIGTLSenderBase *> SendersType;
     SendersType mSenders;
+
+    typedef std::multimap<std::string, mtsIGTLReceiverBase *> ReceiversType;
+    ReceiversType mReceivers;
 };
 
 
 template <typename _cisstType, typename _igtlType>
-bool mtsIGTLSender<_cisstType, _igtlType>::Execute(void) {
+bool mtsIGTLSender<_cisstType, _igtlType>::Execute(void)
+{
     mtsExecutionResult result = Function(mCISSTData);
     if (result) {
         mIGTLData = _igtlType::New();
@@ -174,7 +224,8 @@ bool mtsIGTLSender<_cisstType, _igtlType>::Execute(void) {
 }
 
 template <typename _cisstType, typename _igtlType>
-void mtsIGTLEventWriteSender<_cisstType, _igtlType>::EventHandler(const _cisstType & cisstData) {
+void mtsIGTLEventWriteSender<_cisstType, _igtlType>::EventHandler(const _cisstType & cisstData)
+{
     mIGTLData = _igtlType::New();
     mIGTLData->SetDeviceName(mName);
     if (mtsCISSTToIGTL(cisstData, mIGTLData)) {
@@ -186,7 +237,8 @@ void mtsIGTLEventWriteSender<_cisstType, _igtlType>::EventHandler(const _cisstTy
 template <typename _cisstType, typename _igtlType>
 bool mtsIGTLBridge::AddSenderFromCommandRead(const std::string & interfaceRequiredName,
                                              const std::string & functionName,
-                                             const std::string & igtlDeviceName) {
+                                             const std::string & igtlDeviceName)
+{
     // check if the interface exists of try to create one
     mtsInterfaceRequired * interfaceRequired
         = this->GetInterfaceRequired(interfaceRequiredName);
@@ -201,8 +253,9 @@ bool mtsIGTLBridge::AddSenderFromCommandRead(const std::string & interfaceRequir
     mtsIGTLSenderBase * newSender =
         new mtsIGTLSender<_cisstType, _igtlType>(igtlDeviceName, this);
     if (!interfaceRequired->AddFunction(functionName, newSender->Function)) {
-        CMN_LOG_CLASS_INIT_ERROR << "AddSenderFromCommandRead: failed to create function \""
-                                 << functionName << "\"" << std::endl;
+        CMN_LOG_CLASS_INIT_ERROR << "AddSenderFromCommandRead: failed to add function \""
+                                 << functionName << "\" to interface required \""
+                                 << interfaceRequiredName << "\"" << std::endl;
         delete newSender;
         return false;
     }
@@ -214,7 +267,8 @@ bool mtsIGTLBridge::AddSenderFromCommandRead(const std::string & interfaceRequir
 template <typename _cisstType, typename _igtlType>
 bool mtsIGTLBridge::AddSenderFromEventWrite(const std::string & interfaceRequiredName,
                                             const std::string & eventName,
-                                            const std::string & igtlDeviceName) {
+                                            const std::string & igtlDeviceName)
+{
     // check if the interface exists of try to create one
     mtsInterfaceRequired * interfaceRequired
         = this->GetInterfaceRequired(interfaceRequiredName);
@@ -226,18 +280,45 @@ bool mtsIGTLBridge::AddSenderFromEventWrite(const std::string & interfaceRequire
                                  << interfaceRequiredName << "\"" << std::endl;
         return false;
     }
-
     mtsIGTLEventWriteSender<_cisstType, _igtlType> * newSender
         = new mtsIGTLEventWriteSender<_cisstType, _igtlType>(igtlDeviceName, this);
     if (!interfaceRequired->AddEventHandlerWrite(&mtsIGTLEventWriteSender<_cisstType, _igtlType>::EventHandler,
                                                  newSender, eventName)) {
         CMN_LOG_CLASS_INIT_ERROR << "AddSenderFromEventWrite: failed to add event \""
-                                 << eventName << "\" required interface \""
+                                 << eventName << "\" to required interface \""
                                  << interfaceRequiredName << "\"" << std::endl;
         delete newSender;
         return false;
     }
     mSenders.push_back(newSender);
+    return true;
+}
+
+template <typename _igtlType, typename _cisstType>
+bool mtsIGTLBridge::AddReceiverToCommandWrite(const std::string & interfaceRequiredName,
+                                              const std::string & commandName,
+                                              const std::string & igtlDeviceName)
+{
+    // check if the interface exists of try to create one
+    mtsInterfaceRequired * interfaceRequired = this->GetInterfaceRequired(interfaceRequiredName);
+    if (!interfaceRequired) {
+        interfaceRequired = this->AddInterfaceRequired(interfaceRequiredName);
+    }
+    if (!interfaceRequired) {
+        CMN_LOG_CLASS_INIT_ERROR << "AddReceiverToCommandWrite: failed to create required interface \""
+                                 << interfaceRequiredName << "\"" << std::endl;
+        return false;
+    }
+    mtsIGTLReceiver<_igtlType, _cisstType> * newReceiver
+        = new mtsIGTLReceiver<_igtlType, _cisstType>(igtlDeviceName, this);
+    if (!interfaceRequired->AddFunction(commandName, newReceiver->Function)) {
+        CMN_LOG_CLASS_INIT_ERROR << "AddReceiverToCommandWrite: failed to add function \""
+                                 << commandName << "\" to interface required \""
+                                 << interfaceRequiredName << "\"" << std::endl;
+        delete newReceiver;
+        return false;
+    }
+    mReceivers.insert({igtlDeviceName, newReceiver});
     return true;
 }
 

@@ -20,9 +20,26 @@ http://www.cisst.org/cisst/license.txt.
 #define _mtsITGLToCISST_h
 
 #include <igtlTransformMessage.h>
+#include <igtlStringMessage.h>
+#include <igtlSensorMessage.h>
+#include <cisstMultiTask/mtsParameterTypes.h>
 #include <cisstParameterTypes/prmPositionCartesianSet.h>
+#include <cisstParameterTypes/prmForceCartesianSet.h>
+#include <cisstParameterTypes/prmStateJoint.h>
 
-void mtsIGTLtoCISST(const igtl::Matrix4x4 & igtlData,
+bool mtsIGTLToCISST(const igtl::StringMessage::Pointer igtlData,
+                    std::string & cisstData);
+
+bool mtsIGTLToCISST(const igtl::Matrix4x4 & igtlData,
                     prmPositionCartesianSet & cisstData);
+
+bool mtsIGTLToCISST(const igtl::TransformMessage::Pointer igtlData,
+                    prmPositionCartesianSet & cisstData);
+
+bool mtsIGTLToCISST(const igtl::SensorMessage::Pointer igtlData,
+                    prmForceCartesianSet & cisstData);
+
+bool mtsIGTLToCISST(const igtl::SensorMessage::Pointer igtlData,
+                    prmStateJoint & cisstData);
 
 #endif  // _mtsITGLToCISST_h

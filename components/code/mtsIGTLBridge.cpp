@@ -17,6 +17,7 @@ http://www.cisst.org/cisst/license.txt.
 */
 
 #include <sawOpenIGTLink/mtsIGTLBridge.h>
+#include <sawOpenIGTLink/mtsIGTLToCISST.h>
 
 #include <igtlServerSocket.h>
 #include <igtlTimeStamp.h>
@@ -42,7 +43,7 @@ void mtsIGTLBridge::InitServer(void)
     mData->mServerSocket = igtl::ServerSocket::New();
     const int result = mData->mServerSocket->CreateServer(mPort);
     if (result < 0) {
-        CMN_LOG_CLASS_INIT_ERROR << "mtsIGTLBridge: can't create server socket on port "
+        CMN_LOG_CLASS_INIT_ERROR << "InitServer: can't create server socket on port "
                                  << mPort << std::endl;
     }
 }
@@ -155,7 +156,17 @@ void mtsIGTLBridge::ReceiveAll(void)
 
         // process message if valid
         if (sendingClientActive >= 1 && sendingClientActive == headerMsg->GetPackSize()) {
-            std::cerr << "Received from device: " << headerMsg->GetDeviceName() << std::endl;
+            const auto deviceName = headerMsg->GetDeviceName();
+            auto range = mReceivers.equal_range(deviceName);
+            bool hasReceiver = false;
+            for (auto receiver = range.first; receiver != range.second; ++receiver) {
+                hasReceiver = true;
+                receiver->second->Execute(socket, headerMsg);
+            }
+            if (!hasReceiver) {
+                CMN_LOG_CLASS_RUN_WARNING << "ReceiveAll: not receiver known for device \""
+                                          << deviceName << "\"" << std::endl;
+            }
         }
 
         if (sendingClientActive == 0) {
@@ -163,7 +174,7 @@ void mtsIGTLBridge::ReceiveAll(void)
             std::string address;
             int port;
             socket->GetSocketAddressAndPort(address, port);
-            CMN_LOG_CLASS_RUN_VERBOSE << "Can't send to client at "
+            CMN_LOG_CLASS_RUN_VERBOSE << "ReceiveAll: can't receive from client at "
                                       << address << ":" << port
                                       << std::endl;
             toBeRemoved.push_back(socket);
@@ -174,7 +185,6 @@ void mtsIGTLBridge::ReceiveAll(void)
     for (auto & socket : toBeRemoved) {
         mData->mSockets.remove(socket);
     }
-
 }
 
 // templated implementation for Send
@@ -198,7 +208,7 @@ void mtsIGTLBridge::Send(_igtlMessagePointer message)
             std::string address;
             int port;
             socket->GetSocketAddressAndPort(address, port);
-            CMN_LOG_CLASS_RUN_VERBOSE << "Can't send to client at "
+            CMN_LOG_CLASS_RUN_VERBOSE << "Send: can't send to client at "
                                       << address << ":" << port
                                       << std::endl;
             toBeRemoved.push_back(socket);
@@ -212,14 +222,48 @@ void mtsIGTLBridge::Send(_igtlMessagePointer message)
 }
 
 // force instantiation
-#include <igtlTransformMessage.h>
 template
-void mtsIGTLBridge::Send<igtl::TransformMessage::Pointer>(igtl::TransformMessage::Pointer message);
+void mtsIGTLBridge::Send<igtl::TransformMessage::Pointer>(igtl::TransformMessage::Pointer);
+template
+void mtsIGTLBridge::Send<igtl::StringMessage::Pointer>(igtl::StringMessage::Pointer);
+template
+void mtsIGTLBridge::Send<igtl::SensorMessage::Pointer>(igtl::SensorMessage::Pointer);
 
-#include <igtlStringMessage.h>
-template
-void mtsIGTLBridge::Send<igtl::StringMessage::Pointer>(igtl::StringMessage::Pointer message);
 
-#include <igtlSensorMessage.h>
+// templated implementation for mtsIGTLReceiver::Execute
+template <typename _igtlType, typename _cisstType>
+bool mtsIGTLReceiver<_igtlType, _cisstType>::Execute(igtl::Socket * socket,
+                                                     igtl::MessageBase * header)
+{
+    IGTLPointer message;
+    message = _igtlType::New();
+    message->SetMessageHeader(header);
+    message->AllocatePack();
+    socket->Receive(message->GetPackBodyPointer(), message->GetPackBodySize());
+    int c = message->Unpack(1);
+    if (c & igtl::MessageHeader::UNPACK_BODY) {
+        // convert igtl message to cisst type
+        if (mtsIGTLToCISST(message, mCISSTData)) {
+            mtsExecutionResult result = Function(mCISSTData);
+            if (result) {
+                return true;
+            } else {
+                CMN_LOG_RUN_WARNING << "mtsIGTLReceiver: failed to execute for device \""
+                                    << header->GetDeviceName() << "\", error:"
+                                    << result << std::endl;
+            }
+        } else {
+            CMN_LOG_RUN_WARNING << "mtsIGTLReceiver: failed to convert data for device \""
+                                << header->GetDeviceName() << "\"" << std::endl;
+        }
+    }
+    return false;
+}
+
+// force implementation
 template
-void mtsIGTLBridge::Send<igtl::SensorMessage::Pointer>(igtl::SensorMessage::Pointer message);
+bool mtsIGTLReceiver<igtl::StringMessage, std::string>::Execute(igtl::Socket *, igtl::MessageBase *);
+template
+bool mtsIGTLReceiver<igtl::SensorMessage, prmForceCartesianSet>::Execute(igtl::Socket *, igtl::MessageBase *);
+template
+bool mtsIGTLReceiver<igtl::SensorMessage, prmStateJoint>::Execute(igtl::Socket *, igtl::MessageBase *);

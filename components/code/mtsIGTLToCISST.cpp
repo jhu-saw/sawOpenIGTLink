@@ -18,7 +18,14 @@ http://www.cisst.org/cisst/license.txt.
 
 #include <sawOpenIGTLink/mtsIGTLToCISST.h>
 
-void mtsIGTtoCISST(const igtl::Matrix4x4 & igtlData,
+bool mtsIGTLToCISST(const igtl::StringMessage::Pointer igtlData,
+                    std::string & cisstData)
+{
+    cisstData = igtlData->GetString();
+    return true;
+}
+
+void mtsIGTToCISST(const igtl::Matrix4x4 & igtlData,
                    prmPositionCartesianSet & cisstData)
 {
     cisstData.Goal().Rotation().Element(0, 0) = igtlData[0][0];
@@ -36,4 +43,29 @@ void mtsIGTtoCISST(const igtl::Matrix4x4 & igtlData,
     cisstData.Goal().Translation().Element(0) = igtlData[0][3];
     cisstData.Goal().Translation().Element(1) = igtlData[1][3];
     cisstData.Goal().Translation().Element(2) = igtlData[2][3];
+}
+
+bool mtsIGTLToCISST(const igtl::TransformMessage::Pointer igtlData,
+                    prmPositionCartesianSet & cisstData)
+{
+    std::cerr << CMN_LOG_DETAILS << " needs to be implemented" << std::endl;
+}
+
+bool mtsIGTLToCISST(const igtl::SensorMessage::Pointer igtlData,
+                    prmForceCartesianSet & cisstData)
+{
+    const size_t length = igtlData->GetLength();
+    std::cerr << length << std::endl;
+    if (length != 6) {
+        return false;
+    }
+    for (size_t index = 0; index < length; ++index) {
+        cisstData.Force().Element(index) = igtlData->GetValue(index);
+    }
+}
+
+bool mtsIGTLToCISST(const igtl::SensorMessage::Pointer igtlData,
+                    prmStateJoint & cisstData)
+{
+    std::cerr << CMN_LOG_DETAILS << " needs to be implemented" << std::endl;
 }
