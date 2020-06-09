@@ -32,17 +32,9 @@ if (cisst_FOUND_AS_REQUIRED)
   # load cisst configuration
   include (${CISST_USE_FILE})
 
-  # Version 3+ is required but it seems OpenIGTLink isn't configured to provide version for find_package
-  find_package (OpenIGTLink
+  # Version 3+ is required
+  find_package (OpenIGTLink 3
                 HINTS igtl /usr/lib/igtl /usr/local/lib/igtl/cmake/igtl-3.1 /usr/local/lib/igtl /usr/local/)
-
-  # Testing version found
-  if (OpenIGTLink_FOUND)
-    if (NOT ("${OpenIGTLink_VERSION_MAJOR}" STREQUAL "3"))
-      message ("Information: code in ${CMAKE_CURRENT_SOURCE_DIR} will not be compiled, looking for OpenIGTLink version 3 but found ${OpenIGTLink_VERSION_MAJOR}")
-      set (OpenIGTLink_FOUND FALSE)
-    endif ()
-  endif ()
 
   if (OpenIGTLink_FOUND)
     # OpenIGTLink settings

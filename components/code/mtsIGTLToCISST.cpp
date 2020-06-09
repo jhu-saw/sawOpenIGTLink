@@ -56,7 +56,6 @@ bool mtsIGTLToCISST(const igtl::SensorMessage::Pointer igtlData,
                     prmForceCartesianSet & cisstData)
 {
     const unsigned int length = igtlData->GetLength();
-    std::cerr << length << std::endl;
     if (length != 6) {
         return false;
     }
