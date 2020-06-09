@@ -34,6 +34,28 @@ It can also be used without any coding using a few configurations files.  This a
 
 # Testing
 
-Once you have your cisst/SAW application configured as an IGTL server, you can test what the application is sending and receiving using the examples found in the OpenIGTLink repository.  In the OpenIGTLink build directory, locate all the executables and more specifically ` ReceiveClient`.  Assuming that you're using both program on the same PC and you're using the default IGTL/Slicer port, try: `ReceiveClient localhost 18944`.  You should see the different messages the device is sending.
- 
+Once you have your cisst/SAW application configured as an IGTL server, you can test what the application is sending and receiving using the programs in the `utilities` directory.   These simple programs are based on examples from the OpenIGTLink repository.
+
+## Receiving
+
+Assuming that you're using both program on the same PC and you're using the default IGTL/Slicer port, try: `igtl_receive localhost 18944`.  You should see the different messages the device is sending.
+
+## Sending a string
+
+Still assuming the same computer and the default Slicer port, you can send a string message (`igtl::StringMessage`) with a user defined device name using:
+```sh
+igtl_send_string localhost 18944 arm/state_command disable
+``` 
+In this example, `arm/state_command` is the device name and `disable` is the string itself.
+
+## Sending a sensor message
+
+You can also send a sensor message (`igtl::SensorMessage`) with a user defined device name.  All the numbers following the device name will be used to size and fill the sensor message:
+```sh
+igtl_send_sensor localhost 18944 arm/servo_cf 0 0 1.5 0 0 0
+```
+In this example, the server will treat all messages sent to the device `arm/servo_cf` as a cartesian force (wrench) to apply (say on a haptic device).  The user can then reset the force to zero using:
+```sh
+igtl_send_sensor localhost 18944 arm/servo_cf 0 0 0 0 0 0
+```
  
