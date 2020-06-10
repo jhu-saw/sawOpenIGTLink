@@ -17,6 +17,7 @@ http://www.cisst.org/cisst/license.txt.
 */
 
 #include <sawOpenIGTLink/mtsIGTLBridge.h>
+#include <sawOpenIGTLink/mtsCISSTToIGTL.h>
 #include <sawOpenIGTLink/mtsIGTLToCISST.h>
 
 #include <igtlServerSocket.h>
@@ -228,6 +229,8 @@ template
 void mtsIGTLBridge::Send<igtl::StringMessage::Pointer>(igtl::StringMessage::Pointer);
 template
 void mtsIGTLBridge::Send<igtl::SensorMessage::Pointer>(igtl::SensorMessage::Pointer);
+template
+void mtsIGTLBridge::Send<igtl::NDArrayMessage::Pointer>(igtl::NDArrayMessage::Pointer);
 
 
 // templated implementation for mtsIGTLReceiver::Execute

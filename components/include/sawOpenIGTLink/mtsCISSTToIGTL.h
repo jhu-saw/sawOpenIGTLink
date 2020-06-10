@@ -22,6 +22,7 @@ http://www.cisst.org/cisst/license.txt.
 #include <igtlTransformMessage.h>
 #include <igtlStringMessage.h>
 #include <igtlSensorMessage.h>
+#include <igtlNDArrayMessage.h>
 #include <cisstMultiTask/mtsParameterTypes.h>
 #include <cisstParameterTypes/prmPositionCartesianGet.h>
 #include <cisstParameterTypes/prmVelocityCartesianGet.h>
@@ -49,6 +50,9 @@ bool mtsCISSTToIGTL(const prmForceCartesianGet & cisstData,
 
 bool mtsCISSTToIGTL(const prmStateJoint & cisstData,
                     igtl::SensorMessage::Pointer igtlData);
+
+bool mtsCISSTToIGTL(const prmStateJoint & cisstData,
+                    igtl::NDArrayMessage::Pointer igtlData);
 
 bool mtsCISSTToIGTL(const prmEventButton & cisstData,
                     igtl::SensorMessage::Pointer igtlData);

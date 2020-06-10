@@ -131,6 +131,58 @@ bool mtsCISSTToIGTL(const prmStateJoint & cisstData,
     return true;
 }
 
+bool mtsCISSTToIGTL(const prmStateJoint & cisstData,
+                    igtl::NDArrayMessage::Pointer igtlData)
+{
+    if (!cisstData.Valid()) {
+        return false;
+    }
+    // determine number of joints for igtl
+    igtlUint16 nbJoints = cisstData.Name().size();
+    // create 6 rows for pos_flag/pos/vel_flag/vel/effort_flag/effort
+    vctDoubleMat matrix(6, nbJoints);
+    if (nbJoints != 0) {
+        // position
+        if (cisstData.Position().size() == 0) {
+            matrix.Row(0).SetAll(0.0);
+            matrix.Row(1).SetAll(0.0);
+        } else {
+            matrix.Row(0).SetAll(1.0);
+            matrix.Row(1).Assign(cisstData.Position());
+        }
+        // velocity
+        if (cisstData.Velocity().size() == 0) {
+            matrix.Row(2).SetAll(0.0);
+            matrix.Row(3).SetAll(0.0);
+        } else {
+            matrix.Row(2).SetAll(1.0);
+            matrix.Row(3).Assign(cisstData.Velocity());
+        }
+        // effort
+        if (cisstData.Effort().size() == 0) {
+            matrix.Row(4).SetAll(0.0);
+            matrix.Row(5).SetAll(0.0);
+        } else {
+            matrix.Row(4).SetAll(1.0);
+            matrix.Row(5).Assign(cisstData.Effort());
+        }
+    }
+    // copy all matrix to array
+    std::vector<igtlUint16> size(2);
+    size[0] = 6;
+    size[1] = nbJoints;
+    igtl::Array<igtl_float64> * array = new igtl::Array<igtl_float64>;
+    array->SetSize(size);
+    array->SetArray((void*) matrix.Pointer()); // this perform a deep copy
+    // assign array to message, message will delete array when done
+    igtlData->SetArray(igtl::NDArrayMessage::TYPE_FLOAT64, array);
+    igtl::TimeStamp::Pointer timeStamp;
+    timeStamp = igtl::TimeStamp::New();
+    timeStamp->SetTime(cisstData.Timestamp());
+    igtlData->SetTimeStamp(timeStamp);
+    return true;
+}
+
 bool mtsCISSTToIGTL(const prmEventButton & cisstData,
                     igtl::SensorMessage::Pointer igtlData)
 {
