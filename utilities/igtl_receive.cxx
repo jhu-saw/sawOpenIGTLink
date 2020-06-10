@@ -16,6 +16,7 @@
 #include <math.h>
 #include <cstdlib>
 #include <cstring>
+#include <set>
 
 #include "igtlOSUtil.h"
 #include "igtlMessageHeader.h"
@@ -24,59 +25,63 @@
 #include "igtlImageMessage.h"
 #include "igtlClientSocket.h"
 #include "igtlStatusMessage.h"
-
-#if OpenIGTLink_PROTOCOL_VERSION >= 2
 #include "igtlSensorMessage.h"
+#include "igtlNDArrayMessage.h"
 #include "igtlPointMessage.h"
 #include "igtlTrajectoryMessage.h"
 #include "igtlStringMessage.h"
 #include "igtlTrackingDataMessage.h"
 #include "igtlQuaternionTrackingDataMessage.h"
 #include "igtlCapabilityMessage.h"
-#endif // OpenIGTLink_PROTOCOL_VERSION >= 2
 
-int ReceiveTransform(igtl::Socket * socket, igtl::MessageHeader::Pointer& header);
-int ReceivePosition(igtl::Socket * socket, igtl::MessageHeader::Pointer& header);
-int ReceiveImage(igtl::Socket * socket, igtl::MessageHeader::Pointer& header);
-int ReceiveStatus(igtl::Socket * socket, igtl::MessageHeader::Pointer& header);
-
-#if OpenIGTLink_PROTOCOL_VERSION >= 2
-  int ReceiveSensor(igtl::Socket * socket, igtl::MessageHeader::Pointer& header);
-  int ReceivePoint(igtl::Socket * socket, igtl::MessageHeader::Pointer& header);
-  int ReceiveTrajectory(igtl::Socket * socket, igtl::MessageHeader::Pointer& header);
-  int ReceiveString(igtl::Socket * socket, igtl::MessageHeader::Pointer& header);
-  int ReceiveTrackingData(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header);
-  int ReceiveQuaternionTrackingData(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header);
-  int ReceiveCapability(igtl::Socket * socket, igtl::MessageHeader * header);
-#endif //OpenIGTLink_PROTOCOL_VERSION >= 2
+int ReceiveTransform(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header);
+int ReceivePosition(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header);
+int ReceiveImage(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header);
+int ReceiveStatus(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header);
+int ReceiveSensor(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header);
+int ReceiveNDArray(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header);
+int ReceivePoint(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header);
+int ReceiveTrajectory(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header);
+int ReceiveString(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header);
+int ReceiveTrackingData(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header);
+int ReceiveQuaternionTrackingData(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header);
+int ReceiveCapability(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader * header);
 
 int main(int argc, char* argv[])
 {
   //------------------------------------------------------------
   // Parse Arguments
 
-  if (argc != 3) // check number of arguments
-    {
+  if (!((argc == 3) || (argc == 4))) {
     // If not correct, print usage
-    std::cerr << "    <hostname> : IP or host name"                    << std::endl;
-    std::cerr << "    <port>     : Port # (18944 in Slicer default)"   << std::endl;
+    std::cerr << "    <hostname> : IP or host name" << std::endl
+	      << "    <port>     : Port # (18944 in Slicer default)" << std::endl
+	      << "    <device>   : Device Name (optional)" << std::endl;
     exit(0);
-    }
+  }
 
   char*  hostname = argv[1];
   int    port     = atoi(argv[2]);
+  bool filterDevice = false;
+  std::string device;
+  if (argc == 4) {
+    filterDevice = true;
+    device = argv[3];
+    std::cout << "Showing only messages with device name: " << device << std::endl;
+  }
 
+  std::set<std::string> devicesSkipped;
+  
   //------------------------------------------------------------
   // Establish Connection
-
   igtl::ClientSocket::Pointer socket;
   socket = igtl::ClientSocket::New();
   int r = socket->ConnectToServer(hostname, port);
 
   if (r != 0)
     {
-    std::cerr << "Cannot connect to the server." << std::endl;
-    exit(0);
+      std::cerr << "Cannot connect to the server." << std::endl;
+      exit(0);
     }
 
   //------------------------------------------------------------
@@ -89,110 +94,119 @@ int main(int argc, char* argv[])
   igtl::TimeStamp::Pointer ts;
   ts = igtl::TimeStamp::New();
 
+  //------------------------------------------------------------
+  // loop
+  for (int i = 0; i < 100; i++) {
 
-  while (1)
-    {
-    //------------------------------------------------------------
-    // loop
-    for (int i = 0; i < 100; i ++)
+    // Initialize receive buffer
+    headerMsg->InitPack();
+
+    // Receive generic header from the socket
+    int r = socket->Receive(headerMsg->GetPackPointer(), headerMsg->GetPackSize());
+    if (r == 0)
       {
-
-      // Initialize receive buffer
-      headerMsg->InitPack();
-
-      // Receive generic header from the socket
-      int r = socket->Receive(headerMsg->GetPackPointer(), headerMsg->GetPackSize());
-      if (r == 0)
-        {
         socket->CloseSocket();
         exit(0);
-        }
-      if (r != headerMsg->GetPackSize())
-        {
-        continue;
-        }
-
-      // Deserialize the header
-      headerMsg->Unpack();
-
-      // Get time stamp
-      igtlUint32 sec;
-      igtlUint32 nanosec;
-
-      headerMsg->GetTimeStamp(ts);
-      ts->GetTimeStamp(&sec, &nanosec);
-
-      std::cerr << "Name: " << headerMsg->GetDeviceName() << std::endl;
-      std::cerr << "Time stamp: "
-                << sec << "." << std::setw(9) << std::setfill('0')
-                << nanosec << std::endl;
-
-      // Check data type and receive data body
-      if (strcmp(headerMsg->GetDeviceType(), "TRANSFORM") == 0)
-        {
-        ReceiveTransform(socket, headerMsg);
-        }
-      else if (strcmp(headerMsg->GetDeviceType(), "POSITION") == 0)
-        {
-          ReceivePosition(socket, headerMsg);
-        }
-      else if (strcmp(headerMsg->GetDeviceType(), "IMAGE") == 0)
-        {
-        ReceiveImage(socket, headerMsg);
-        }
-      else if (strcmp(headerMsg->GetDeviceType(), "STATUS") == 0)
-        {
-        ReceiveStatus(socket, headerMsg);
-        }
-#if OpenIGTLink_PROTOCOL_VERSION >= 2
-      else if (strcmp(headerMsg->GetDeviceType(), "SENSOR") == 0)
-        {
-          ReceiveSensor(socket, headerMsg);
-        }
-      else if (strcmp(headerMsg->GetDeviceType(), "POINT") == 0)
-        {
-        ReceivePoint(socket, headerMsg);
-        }
-      else if (strcmp(headerMsg->GetDeviceType(), "TRAJ") == 0)
-        {
-        ReceiveTrajectory(socket, headerMsg);
-        }
-      else if (strcmp(headerMsg->GetDeviceType(), "STRING") == 0)
-        {
-        ReceiveString(socket, headerMsg);
-        }
-      else if (strcmp(headerMsg->GetDeviceType(), "TDATA") == 0)
-        {
-        ReceiveTrackingData(socket, headerMsg);
-        }
-      else if (strcmp(headerMsg->GetDeviceType(), "QTDATA") == 0)
-        {
-        ReceiveQuaternionTrackingData(socket, headerMsg);
-        }
-      else if (strcmp(headerMsg->GetDeviceType(), "CAPABILITY") == 0)
-        {
-        ReceiveCapability(socket, headerMsg);;
-        }
-#endif //OpenIGTLink_PROTOCOL_VERSION >= 2
-      else
-        {
-        std::cerr << "Receiving : " << headerMsg->GetDeviceType() << std::endl;
-        socket->Skip(headerMsg->GetBodySizeToRead(), 0);
-        }
       }
+    if (r != headerMsg->GetPackSize())
+      {
+        continue;
+      }
+
+    // Deserialize the header
+    headerMsg->Unpack();
+
+    // Filter if need
+    std::string messageDevice = headerMsg->GetDeviceName();
+    if (filterDevice && (messageDevice != device)) {
+      devicesSkipped.insert(messageDevice);
+      socket->Skip(headerMsg->GetBodySizeToRead(), 0);
+      continue;
     }
 
-  //------------------------------------------------------------
-  // Close connection (The example code never reaches this section ...)
+    // Get time stamp
+    igtlUint32 sec;
+    igtlUint32 nanosec;
 
+    headerMsg->GetTimeStamp(ts);
+    ts->GetTimeStamp(&sec, &nanosec);
+
+    std::cerr << "Device name: " << messageDevice << std::endl;
+    std::cout << "Time stamp: "
+	      << sec << "." << std::setw(9) << std::setfill('0')
+	      << nanosec << std::endl;
+
+    // Check data type and receive data body
+    if (strcmp(headerMsg->GetDeviceType(), "TRANSFORM") == 0)
+      {
+        ReceiveTransform(socket, headerMsg);
+      }
+    else if (strcmp(headerMsg->GetDeviceType(), "POSITION") == 0)
+      {
+	ReceivePosition(socket, headerMsg);
+      }
+    else if (strcmp(headerMsg->GetDeviceType(), "IMAGE") == 0)
+      {
+        ReceiveImage(socket, headerMsg);
+      }
+    else if (strcmp(headerMsg->GetDeviceType(), "STATUS") == 0)
+      {
+        ReceiveStatus(socket, headerMsg);
+      }
+    else if (strcmp(headerMsg->GetDeviceType(), "SENSOR") == 0)
+      {
+	ReceiveSensor(socket, headerMsg);
+      }
+    else if (strcmp(headerMsg->GetDeviceType(), "NDARRAY") == 0)
+      {
+	ReceiveNDArray(socket, headerMsg);
+      }
+    else if (strcmp(headerMsg->GetDeviceType(), "POINT") == 0)
+      {
+        ReceivePoint(socket, headerMsg);
+      }
+    else if (strcmp(headerMsg->GetDeviceType(), "TRAJ") == 0)
+      {
+        ReceiveTrajectory(socket, headerMsg);
+      }
+    else if (strcmp(headerMsg->GetDeviceType(), "STRING") == 0)
+      {
+        ReceiveString(socket, headerMsg);
+      }
+    else if (strcmp(headerMsg->GetDeviceType(), "TDATA") == 0)
+      {
+        ReceiveTrackingData(socket, headerMsg);
+      }
+    else if (strcmp(headerMsg->GetDeviceType(), "QTDATA") == 0)
+      {
+        ReceiveQuaternionTrackingData(socket, headerMsg);
+      }
+    else if (strcmp(headerMsg->GetDeviceType(), "CAPABILITY") == 0)
+      {
+        ReceiveCapability(socket, headerMsg);;
+      }
+    else
+      {
+        std::cout << "Receiving: " << headerMsg->GetDeviceType() << std::endl;
+        socket->Skip(headerMsg->GetBodySizeToRead(), 0);
+      }
+  }
+
+
+  //------------------------------------------------------------
+  // Close connection
   socket->CloseSocket();
 
+  std::cerr << std::endl << "Received and skipped messages from devices: " << std::endl;
+  for (auto & dev : devicesSkipped) {
+    std::cerr << dev << std::endl;
+  } 
 }
 
 
-int ReceiveTransform(igtl::Socket * socket, igtl::MessageHeader::Pointer& header)
+int ReceiveTransform(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header)
 {
-  std::cerr << "Receiving TRANSFORM data type." << std::endl;
+  std::cout << "Receiving TRANSFORM data type." << std::endl;
 
   // Create a message buffer to receive transform datag
   igtl::TransformMessage::Pointer transMsg;
@@ -209,20 +223,19 @@ int ReceiveTransform(igtl::Socket * socket, igtl::MessageHeader::Pointer& header
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
-    // Retrive the transform data
-    igtl::Matrix4x4 matrix;
-    transMsg->GetMatrix(matrix);
-    igtl::PrintMatrix(matrix);
-    std::cerr << std::endl;
-    return 1;
+      // Retrive the transform data
+      igtl::Matrix4x4 matrix;
+      transMsg->GetMatrix(matrix);
+      igtl::PrintMatrix(matrix);
+      return 1;
     }
 
   return 0;
 }
 
-int ReceiveSensor(igtl::Socket * socket, igtl::MessageHeader::Pointer& header)
+int ReceiveSensor(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header)
 {
-  std::cerr << "Receiving SENSOR data type." << std::endl;
+  std::cout << "Receiving SENSOR data type." << std::endl;
 
   // Create a message buffer to receive transform datag
   igtl::SensorMessage::Pointer sensMsg;
@@ -239,19 +252,70 @@ int ReceiveSensor(igtl::Socket * socket, igtl::MessageHeader::Pointer& header)
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
-    for (size_t i = 0; i < sensMsg->GetLength(); ++i) {
-	std::cerr << "v[" << i << "]: " << sensMsg->GetValue(i) << " ";
+      for (size_t i = 0; i < sensMsg->GetLength(); ++i) {
+	std::cout << "v[" << i << "]: " << sensMsg->GetValue(i) << " ";
+      }
+      std::cout << std::endl;
+      return 1;
     }
-    std::cerr << std::endl;
-    return 1;
-  }
 
   return 0;
 }
 
-int ReceivePosition(igtl::Socket * socket, igtl::MessageHeader::Pointer& header)
+int ReceiveNDArray(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header)
 {
-  std::cerr << "Receiving POSITION data type." << std::endl;
+  std::cout << "Receiving NDARRAY data type." << std::endl;
+
+  // Create a message buffer to receive transform datag
+  igtl::NDArrayMessage::Pointer arrayMsg;
+  arrayMsg = igtl::NDArrayMessage::New();
+  arrayMsg->SetMessageHeader(header);
+  arrayMsg->AllocatePack();
+  
+  // Receive array data from the socket
+  socket->Receive(arrayMsg->GetPackBodyPointer(), arrayMsg->GetPackBodySize());
+  
+  // Deserialize the array data
+  // If you want to skip CRC check, call Unpack() without argument.
+  int c = arrayMsg->Unpack(1);
+  
+  if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
+    {
+      // get dimension
+      std::vector<igtlUint16> sizes = arrayMsg->GetArray()->GetSize();
+      std::cout << "Dimension: " << sizes.size() << " size:";
+      for (auto & s : sizes) {
+	std::cout << " " << s;
+      }
+      std::cout << std::endl;
+      // get type and display as long as dimension is less than 2
+      if (arrayMsg->GetType() == igtl::NDArrayMessage::TYPE_FLOAT64) {
+	igtlFloat64 * rawData = reinterpret_cast<igtlFloat64 *>(arrayMsg->GetArray()->GetRawArray());
+	if (sizes.size() == 1) {
+	  for (size_t i = 0; i < sizes.at(0); ++i) {
+	    std::cout << *rawData << " ";
+	    rawData++;
+	  }
+	  std::cout << std::endl;
+	} else if (sizes.size() == 2) {
+	  for (size_t i = 0; i < sizes.at(0); ++i) {
+	    for (size_t j = 0; j < sizes.at(1); ++j) {
+	      std::cout << *rawData << " ";
+	      rawData++;
+	    }
+	    std::cout << std::endl;
+	  }
+	}
+      }
+      return 1;
+    }
+  
+  return 0;
+}
+
+int ReceivePosition(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header)
+{
+  std::cout << "Receiving POSITION data type." << std::endl;
 
   // Create a message buffer to receive transform data
   igtl::PositionMessage::Pointer positionMsg;
@@ -268,26 +332,26 @@ int ReceivePosition(igtl::Socket * socket, igtl::MessageHeader::Pointer& header)
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
-    // Retrive the transform data
-    float position[3];
-    float quaternion[4];
+      // Retrive the transform data
+      float position[3];
+      float quaternion[4];
 
-    positionMsg->GetPosition(position);
-    positionMsg->GetQuaternion(quaternion);
+      positionMsg->GetPosition(position);
+      positionMsg->GetQuaternion(quaternion);
 
-    std::cerr << "position   = (" << position[0] << ", " << position[1] << ", " << position[2] << ")" << std::endl;
-    std::cerr << "quaternion = (" << quaternion[0] << ", " << quaternion[1] << ", "
-              << quaternion[2] << ", " << quaternion[3] << ")" << std::endl << std::endl;
+      std::cout << "position   = (" << position[0] << ", " << position[1] << ", " << position[2] << ")" << std::endl;
+      std::cout << "quaternion = (" << quaternion[0] << ", " << quaternion[1] << ", "
+		<< quaternion[2] << ", " << quaternion[3] << ")" << std::endl << std::endl;
 
-    return 1;
+      return 1;
     }
 
   return 0;
 }
 
-int ReceiveImage(igtl::Socket * socket, igtl::MessageHeader::Pointer& header)
+int ReceiveImage(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header)
 {
-  std::cerr << "Receiving IMAGE data type." << std::endl;
+  std::cout << "Receiving IMAGE data type." << std::endl;
 
   // Create a message buffer to receive transform data
   igtl::ImageMessage::Pointer imgMsg;
@@ -304,33 +368,33 @@ int ReceiveImage(igtl::Socket * socket, igtl::MessageHeader::Pointer& header)
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
-    // Retrive the image data
-    int   size[3];          // image dimension
-    float spacing[3];       // spacing (mm/pixel)
-    int   svsize[3];        // sub-volume size
-    int   svoffset[3];      // sub-volume offset
-    int   scalarType;       // scalar type
-    int   endian;           // endian
+      // Retrive the image data
+      int   size[3];          // image dimension
+      float spacing[3];       // spacing (mm/pixel)
+      int   svsize[3];        // sub-volume size
+      int   svoffset[3];      // sub-volume offset
+      int   scalarType;       // scalar type
+      int   endian;           // endian
 
-    scalarType = imgMsg->GetScalarType();
-    endian = imgMsg->GetEndian();
-    imgMsg->GetDimensions(size);
-    imgMsg->GetSpacing(spacing);
-    imgMsg->GetSubVolume(svsize, svoffset);
+      scalarType = imgMsg->GetScalarType();
+      endian = imgMsg->GetEndian();
+      imgMsg->GetDimensions(size);
+      imgMsg->GetSpacing(spacing);
+      imgMsg->GetSubVolume(svsize, svoffset);
 
 
-    std::cerr << "Device Name           : " << imgMsg->GetDeviceName() << std::endl;
-    std::cerr << "Scalar Type           : " << scalarType << std::endl;
-    std::cerr << "Endian                : " << endian << std::endl;
-    std::cerr << "Dimensions            : ("
-              << size[0] << ", " << size[1] << ", " << size[2] << ")" << std::endl;
-    std::cerr << "Spacing               : ("
-              << spacing[0] << ", " << spacing[1] << ", " << spacing[2] << ")" << std::endl;
-    std::cerr << "Sub-Volume dimensions : ("
-              << svsize[0] << ", " << svsize[1] << ", " << svsize[2] << ")" << std::endl;
-    std::cerr << "Sub-Volume offset     : ("
-              << svoffset[0] << ", " << svoffset[1] << ", " << svoffset[2] << ")" << std::endl << std::endl;
-    return 1;
+      std::cout << "Device Name           : " << imgMsg->GetDeviceName() << std::endl;
+      std::cout << "Scalar Type           : " << scalarType << std::endl;
+      std::cout << "Endian                : " << endian << std::endl;
+      std::cout << "Dimensions            : ("
+		<< size[0] << ", " << size[1] << ", " << size[2] << ")" << std::endl;
+      std::cout << "Spacing               : ("
+		<< spacing[0] << ", " << spacing[1] << ", " << spacing[2] << ")" << std::endl;
+      std::cout << "Sub-Volume dimensions : ("
+		<< svsize[0] << ", " << svsize[1] << ", " << svsize[2] << ")" << std::endl;
+      std::cout << "Sub-Volume offset     : ("
+		<< svoffset[0] << ", " << svoffset[1] << ", " << svoffset[2] << ")" << std::endl << std::endl;
+      return 1;
     }
 
   return 0;
@@ -338,10 +402,10 @@ int ReceiveImage(igtl::Socket * socket, igtl::MessageHeader::Pointer& header)
 }
 
 
-int ReceiveStatus(igtl::Socket * socket, igtl::MessageHeader::Pointer& header)
+int ReceiveStatus(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header)
 {
 
-  std::cerr << "Receiving STATUS data type." << std::endl;
+  std::cout << "Receiving STATUS data type." << std::endl;
 
   // Create a message buffer to receive transform data
   igtl::StatusMessage::Pointer statusMsg;
@@ -358,23 +422,22 @@ int ReceiveStatus(igtl::Socket * socket, igtl::MessageHeader::Pointer& header)
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
-    std::cerr << "========== STATUS ==========" << std::endl;
-    std::cerr << " Code      : " << statusMsg->GetCode() << std::endl;
-    std::cerr << " SubCode   : " << statusMsg->GetSubCode() << std::endl;
-    std::cerr << " Error Name: " << statusMsg->GetErrorName() << std::endl;
-    std::cerr << " Status    : " << statusMsg->GetStatusString() << std::endl;
-    std::cerr << "============================" << std::endl << std::endl;
+      std::cout << "========== STATUS ==========" << std::endl;
+      std::cout << " Code      : " << statusMsg->GetCode() << std::endl;
+      std::cout << " SubCode   : " << statusMsg->GetSubCode() << std::endl;
+      std::cout << " Error Name: " << statusMsg->GetErrorName() << std::endl;
+      std::cout << " Status    : " << statusMsg->GetStatusString() << std::endl;
+      std::cout << "============================" << std::endl << std::endl;
     }
 
   return 0;
 
 }
 
-#if OpenIGTLink_PROTOCOL_VERSION >= 2
-int ReceivePoint(igtl::Socket * socket, igtl::MessageHeader::Pointer& header)
+int ReceivePoint(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header)
 {
 
-  std::cerr << "Receiving POINT data type." << std::endl;
+  std::cout << "Receiving POINT data type." << std::endl;
 
   // Create a message buffer to receive transform data
   igtl::PointMessage::Pointer pointMsg;
@@ -391,36 +454,36 @@ int ReceivePoint(igtl::Socket * socket, igtl::MessageHeader::Pointer& header)
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
-    int nElements = pointMsg->GetNumberOfPointElement();
-    for (int i = 0; i < nElements; i ++)
-      {
-      igtl::PointElement::Pointer pointElement;
-      pointMsg->GetPointElement(i, pointElement);
+      int nElements = pointMsg->GetNumberOfPointElement();
+      for (int i = 0; i < nElements; i ++)
+	{
+	  igtl::PointElement::Pointer pointElement;
+	  pointMsg->GetPointElement(i, pointElement);
 
-      igtlUint8 rgba[4];
-      pointElement->GetRGBA(rgba);
+	  igtlUint8 rgba[4];
+	  pointElement->GetRGBA(rgba);
 
-      igtlFloat32 pos[3];
-      pointElement->GetPosition(pos);
+	  igtlFloat32 pos[3];
+	  pointElement->GetPosition(pos);
 
-      std::cerr << "========== Element #" << i << " ==========" << std::endl;
-      std::cerr << " Name      : " << pointElement->GetName() << std::endl;
-      std::cerr << " GroupName : " << pointElement->GetGroupName() << std::endl;
-      std::cerr << " RGBA      : ( " << (int)rgba[0] << ", " << (int)rgba[1] << ", " << (int)rgba[2] << ", " << (int)rgba[3] << " )" << std::endl;
-      std::cerr << " Position  : ( " << std::fixed << pos[0] << ", " << pos[1] << ", " << pos[2] << " )" << std::endl;
-      std::cerr << " Radius    : " << std::fixed << pointElement->GetRadius() << std::endl;
-      std::cerr << " Owner     : " << pointElement->GetOwner() << std::endl;
-      std::cerr << "================================" << std::endl << std::endl;
-      }
+	  std::cout << "========== Element #" << i << " ==========" << std::endl;
+	  std::cout << " Name      : " << pointElement->GetName() << std::endl;
+	  std::cout << " GroupName : " << pointElement->GetGroupName() << std::endl;
+	  std::cout << " RGBA      : ( " << (int)rgba[0] << ", " << (int)rgba[1] << ", " << (int)rgba[2] << ", " << (int)rgba[3] << " )" << std::endl;
+	  std::cout << " Position  : ( " << std::fixed << pos[0] << ", " << pos[1] << ", " << pos[2] << " )" << std::endl;
+	  std::cout << " Radius    : " << std::fixed << pointElement->GetRadius() << std::endl;
+	  std::cout << " Owner     : " << pointElement->GetOwner() << std::endl;
+	  std::cout << "================================" << std::endl << std::endl;
+	}
     }
 
   return 1;
 }
 
-int ReceiveTrajectory(igtl::Socket * socket, igtl::MessageHeader::Pointer& header)
+int ReceiveTrajectory(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header)
 {
 
-  std::cerr << "Receiving TRAJECTORY data type." << std::endl;
+  std::cout << "Receiving TRAJECTORY data type." << std::endl;
 
   // Create a message buffer to receive transform data
   igtl::TrajectoryMessage::Pointer trajectoryMsg;
@@ -437,39 +500,39 @@ int ReceiveTrajectory(igtl::Socket * socket, igtl::MessageHeader::Pointer& heade
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
-    int nElements = trajectoryMsg->GetNumberOfTrajectoryElement();
-    for (int i = 0; i < nElements; i ++)
-      {
-      igtl::TrajectoryElement::Pointer trajectoryElement;
-      trajectoryMsg->GetTrajectoryElement(i, trajectoryElement);
+      int nElements = trajectoryMsg->GetNumberOfTrajectoryElement();
+      for (int i = 0; i < nElements; i ++)
+	{
+	  igtl::TrajectoryElement::Pointer trajectoryElement;
+	  trajectoryMsg->GetTrajectoryElement(i, trajectoryElement);
 
-      igtlUint8 rgba[4];
-      trajectoryElement->GetRGBA(rgba);
+	  igtlUint8 rgba[4];
+	  trajectoryElement->GetRGBA(rgba);
 
-      igtlFloat32 entry[3];
-      igtlFloat32 target[3];
-      trajectoryElement->GetEntryPosition(entry);
-      trajectoryElement->GetTargetPosition(target);
+	  igtlFloat32 entry[3];
+	  igtlFloat32 target[3];
+	  trajectoryElement->GetEntryPosition(entry);
+	  trajectoryElement->GetTargetPosition(target);
 
-      std::cerr << "========== Element #" << i << " ==========" << std::endl;
-      std::cerr << " Name      : " << trajectoryElement->GetName() << std::endl;
-      std::cerr << " GroupName : " << trajectoryElement->GetGroupName() << std::endl;
-      std::cerr << " RGBA      : ( " << (int)rgba[0] << ", " << (int)rgba[1] << ", " << (int)rgba[2] << ", " << (int)rgba[3] << " )" << std::endl;
-      std::cerr << " Entry Pt  : ( " << std::fixed << entry[0] << ", " << entry[1] << ", " << entry[2] << " )" << std::endl;
-      std::cerr << " Target Pt : ( " << std::fixed << target[0] << ", " << target[1] << ", " << target[2] << " )" << std::endl;
-      std::cerr << " Radius    : " << std::fixed << trajectoryElement->GetRadius() << std::endl;
-      std::cerr << " Owner     : " << trajectoryElement->GetOwner() << std::endl;
-      std::cerr << "================================" << std::endl << std::endl;
-      }
+	  std::cout << "========== Element #" << i << " ==========" << std::endl;
+	  std::cout << " Name      : " << trajectoryElement->GetName() << std::endl;
+	  std::cout << " GroupName : " << trajectoryElement->GetGroupName() << std::endl;
+	  std::cout << " RGBA      : ( " << (int)rgba[0] << ", " << (int)rgba[1] << ", " << (int)rgba[2] << ", " << (int)rgba[3] << " )" << std::endl;
+	  std::cout << " Entry Pt  : ( " << std::fixed << entry[0] << ", " << entry[1] << ", " << entry[2] << " )" << std::endl;
+	  std::cout << " Target Pt : ( " << std::fixed << target[0] << ", " << target[1] << ", " << target[2] << " )" << std::endl;
+	  std::cout << " Radius    : " << std::fixed << trajectoryElement->GetRadius() << std::endl;
+	  std::cout << " Owner     : " << trajectoryElement->GetOwner() << std::endl;
+	  std::cout << "================================" << std::endl << std::endl;
+	}
     }
 
   return 1;
 }
 
-int ReceiveString(igtl::Socket * socket, igtl::MessageHeader::Pointer& header)
+int ReceiveString(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header)
 {
 
-  std::cerr << "Receiving STRING data type." << std::endl;
+  std::cout << "Receiving STRING data type." << std::endl;
 
   // Create a message buffer to receive transform data
   igtl::StringMessage::Pointer stringMsg;
@@ -486,8 +549,8 @@ int ReceiveString(igtl::Socket * socket, igtl::MessageHeader::Pointer& header)
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
-    std::cerr << "Encoding: " << stringMsg->GetEncoding() << "; "
-              << "String: " << stringMsg->GetString() << std::endl << std::endl;
+      std::cout << "Encoding: " << stringMsg->GetEncoding() << "; "
+		<< "String: " << stringMsg->GetString() << std::endl << std::endl;
     }
 
   return 1;
@@ -495,7 +558,7 @@ int ReceiveString(igtl::Socket * socket, igtl::MessageHeader::Pointer& header)
 
 int ReceiveTrackingData(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header)
 {
-  std::cerr << "Receiving TDATA data type." << std::endl;
+  std::cout << "Receiving TDATA data type." << std::endl;
 
   // Create a message buffer to receive transform data
   igtl::TrackingDataMessage::Pointer trackingData;
@@ -512,31 +575,31 @@ int ReceiveTrackingData(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
-    int nElements = trackingData->GetNumberOfTrackingDataElements();
-    for (int i = 0; i < nElements; i ++)
-      {
-      igtl::TrackingDataElement::Pointer trackingElement;
-      trackingData->GetTrackingDataElement(i, trackingElement);
+      int nElements = trackingData->GetNumberOfTrackingDataElements();
+      for (int i = 0; i < nElements; i ++)
+	{
+	  igtl::TrackingDataElement::Pointer trackingElement;
+	  trackingData->GetTrackingDataElement(i, trackingElement);
 
-      igtl::Matrix4x4 matrix;
-      trackingElement->GetMatrix(matrix);
+	  igtl::Matrix4x4 matrix;
+	  trackingElement->GetMatrix(matrix);
 
 
-      std::cerr << "========== Element #" << i << " ==========" << std::endl;
-      std::cerr << " Name       : " << trackingElement->GetName() << std::endl;
-      std::cerr << " Type       : " << (int) trackingElement->GetType() << std::endl;
-      std::cerr << " Matrix : " << std::endl;
-      igtl::PrintMatrix(matrix);
-      std::cerr << "================================" << std::endl << std::endl;
-      }
-    return 1;
+	  std::cout << "========== Element #" << i << " ==========" << std::endl;
+	  std::cout << " Name       : " << trackingElement->GetName() << std::endl;
+	  std::cout << " Type       : " << (int) trackingElement->GetType() << std::endl;
+	  std::cout << " Matrix : " << std::endl;
+	  igtl::PrintMatrix(matrix);
+	  std::cout << "================================" << std::endl;
+	}
+      return 1;
     }
   return 0;
 }
 
 int ReceiveQuaternionTrackingData(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader::Pointer& header)
 {
-  std::cerr << "Receiving QTDATA data type." << std::endl;
+  std::cout << "Receiving QTDATA data type." << std::endl;
 
   // Create a message buffer to receive transform data
   igtl::QuaternionTrackingDataMessage::Pointer quaternionTrackingData;
@@ -553,33 +616,33 @@ int ReceiveQuaternionTrackingData(igtl::ClientSocket::Pointer& socket, igtl::Mes
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
-    int nElements = quaternionTrackingData->GetNumberOfQuaternionTrackingDataElements();
-    for (int i = 0; i < nElements; i ++)
-      {
-      igtl::QuaternionTrackingDataElement::Pointer quaternionTrackingElement;
-      quaternionTrackingData->GetQuaternionTrackingDataElement(i, quaternionTrackingElement);
+      int nElements = quaternionTrackingData->GetNumberOfQuaternionTrackingDataElements();
+      for (int i = 0; i < nElements; i ++)
+	{
+	  igtl::QuaternionTrackingDataElement::Pointer quaternionTrackingElement;
+	  quaternionTrackingData->GetQuaternionTrackingDataElement(i, quaternionTrackingElement);
 
-      float position[3];
-      float quaternion[4];
-      quaternionTrackingElement->GetPosition(position);
-      quaternionTrackingElement->GetQuaternion(quaternion);
+	  float position[3];
+	  float quaternion[4];
+	  quaternionTrackingElement->GetPosition(position);
+	  quaternionTrackingElement->GetQuaternion(quaternion);
 
-      std::cerr << "========== Element #" << i << " ==========" << std::endl;
-      std::cerr << " Name       : " << quaternionTrackingElement->GetName() << std::endl;
-      std::cerr << " Type       : " << (int) quaternionTrackingElement->GetType() << std::endl;
-      std::cerr << " Position   : "; igtl::PrintVector3(position);
-      std::cerr << " Quaternion : "; igtl::PrintVector4(quaternion);
-      std::cerr << "================================" << std::endl << std::endl;
-      }
-    return 1;
+	  std::cout << "========== Element #" << i << " ==========" << std::endl;
+	  std::cout << " Name       : " << quaternionTrackingElement->GetName() << std::endl;
+	  std::cout << " Type       : " << (int) quaternionTrackingElement->GetType() << std::endl;
+	  std::cout << " Position   : "; igtl::PrintVector3(position);
+	  std::cout << " Quaternion : "; igtl::PrintVector4(quaternion);
+	  std::cout << "================================" << std::endl;
+	}
+      return 1;
     }
   return 0;
 }
 
-int ReceiveCapability(igtl::Socket * socket, igtl::MessageHeader * header)
+int ReceiveCapability(igtl::ClientSocket::Pointer& socket, igtl::MessageHeader * header)
 {
 
-  std::cerr << "Receiving CAPABILITY data type." << std::endl;
+  std::cout << "Receiving CAPABILITY data type." << std::endl;
 
   // Create a message buffer to receive transform data
   igtl::CapabilityMessage::Pointer capabilMsg;
@@ -596,15 +659,13 @@ int ReceiveCapability(igtl::Socket * socket, igtl::MessageHeader * header)
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
-    int nTypes = capabilMsg->GetNumberOfTypes();
-    for (int i = 0; i < nTypes; i ++)
-      {
-      std::cerr << "Typename #" << i << ": " << capabilMsg->GetType(i) << std::endl;
-      }
+      int nTypes = capabilMsg->GetNumberOfTypes();
+      for (int i = 0; i < nTypes; i ++)
+	{
+	  std::cout << "Typename #" << i << ": " << capabilMsg->GetType(i) << std::endl;
+	}
     }
 
   return 1;
 
 }
-
-#endif //OpenIGTLink_PROTOCOL_VERSION >= 2
