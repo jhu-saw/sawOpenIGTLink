@@ -152,7 +152,7 @@ void mtsIGTLCRTKBridge::BridgeInterfaceProvided(const std::string & componentNam
             if ((crtkCommand == "measured_js")
                 || (crtkCommand == "setpoint_js")) {
                 connectionNeeded = true;
-                AddSenderFromCommandRead<prmStateJoint, igtl::SensorMessage>
+                AddSenderFromCommandRead<prmStateJoint, igtl::NDArrayMessage>
                     (requiredInterfaceName, command, nameSpace + '/' + command);
             } else if ((crtkCommand == "measured_cp")
                        || (crtkCommand == "setpoint_cp")) {
