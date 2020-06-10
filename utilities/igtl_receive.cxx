@@ -96,7 +96,7 @@ int main(int argc, char* argv[])
 
   //------------------------------------------------------------
   // loop
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i < 1000; i++) {
 
     // Initialize receive buffer
     headerMsg->InitPack();

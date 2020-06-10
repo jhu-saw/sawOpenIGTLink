@@ -38,7 +38,17 @@ Once you have your cisst/SAW application configured as an IGTL server, you can t
 
 ## Receiving
 
-Assuming that you're using both program on the same PC and you're using the default IGTL/Slicer port, try: `igtl_receive localhost 18944`.  You should see the different messages the device is sending.
+Assuming that you're using both program on the same PC and you're using the default IGTL/Slicer port, try: `igtl_receive localhost 18944`.  You should see the different messages the device is sending (1000 messages).
+
+If you only want to display messages associated to a specific device name, set the device name as 3rd parameter:
+```sh
+igtl_receive localhost 18944 arm/measured_js
+```
+
+Before quitting, `igtl_receive` will display the list of device names for all the messages received.  So if you just want to see the list of device names you can use:
+```sh
+igtl_receive localhost 18944 whatever_name_you_know_doesn_t_exist
+```
 
 ## Sending a string
 
