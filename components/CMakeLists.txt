@@ -105,7 +105,7 @@ if (cisst_FOUND_AS_REQUIRED)
 
     cisst_add_config_version ("${sawOpenIGTLink_CONFIG_FILE_DIR}/sawOpenIGTLinkConfigVersion.cmake"
                               VERSION ${sawOpenIGTLink_VERSION}
-                              DESTINATION "share/sawOpenIGTLink"
+                              DESTINATION ${CISST_CMAKE_INSTALL_SUFFIX}/saw
                               COMPONENT sawOpenIGTLink)
 
     # Install target for headers and library
