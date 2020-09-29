@@ -30,4 +30,6 @@ if (OpenIGTLink_FOUND)
 
 else ()
   message ("Information: code in ${CMAKE_CURRENT_SOURCE_DIR} will not be compiled, it requires OpenIGTLink 3")
+  # dummy install target for catkin package type "cmake"
+  install (FILES doesnotexist DESTINATION share OPTIONAL)
 endif ()
