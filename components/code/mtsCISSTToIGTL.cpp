@@ -203,3 +203,12 @@ bool mtsCISSTToIGTL(const prmEventButton & cisstData,
     igtlData->SetTimeStamp(timeStamp);
     return true;
 }
+
+bool mtsCISSTToIGTL(const vct3 &cisstData, igtl::PointMessage::Pointer igtlData)
+{
+    igtl::PointElement::Pointer p;
+    p = igtl::PointElement::New();
+    p->SetPosition(cisstData.X(),cisstData.Y(),cisstData.Z());
+    igtlData->AddPointElement(p);
+    return true;
+}

@@ -25,7 +25,7 @@ bool mtsIGTLToCISST(const igtl::StringMessage::Pointer igtlData,
     return true;
 }
 
-void mtsIGTToCISST(const igtl::Matrix4x4 & igtlData,
+bool mtsIGTLToCISST(const igtl::Matrix4x4 & igtlData,
                    prmPositionCartesianSet & cisstData)
 {
     cisstData.Goal().Rotation().Element(0, 0) = igtlData[0][0];
@@ -40,15 +40,25 @@ void mtsIGTToCISST(const igtl::Matrix4x4 & igtlData,
     cisstData.Goal().Rotation().Element(1, 2) = igtlData[1][2];
     cisstData.Goal().Rotation().Element(2, 2) = igtlData[2][2];
 
+    cisstData.Goal().Rotation().NormalizedSelf();
+
     cisstData.Goal().Translation().Element(0) = igtlData[0][3];
     cisstData.Goal().Translation().Element(1) = igtlData[1][3];
     cisstData.Goal().Translation().Element(2) = igtlData[2][3];
+
+    cisstData.SetValid(true);
+    return true;
 }
 
 bool mtsIGTLToCISST(const igtl::TransformMessage::Pointer igtlData,
                     prmPositionCartesianSet & cisstData)
 {
-    std::cerr << CMN_LOG_DETAILS << " needs to be implemented" << std::endl;
+    igtl::Matrix4x4 m;
+    igtlData->GetMatrix(m);
+    if (mtsIGTLToCISST(m,cisstData)){
+        return true;
+    }
+
     return false;
 }
 
@@ -70,4 +80,18 @@ bool mtsIGTLToCISST(const igtl::SensorMessage::Pointer igtlData,
 {
     std::cerr << CMN_LOG_DETAILS << " needs to be implemented" << std::endl;
     return false;
+}
+
+bool mtsIGTLToCISST(const igtl::PointMessage::Pointer igtlData, vct3 &cisstData)
+{
+    igtl::PointElement::Pointer p;
+    p = igtl::PointElement::New();
+    igtlData->GetPointElement(0,p);
+    float x,y,z;
+    p->GetPosition(x,y,z);
+    cisstData[0] = x;
+    cisstData[1] = y;
+    cisstData[2] = z;
+
+    return true;
 }

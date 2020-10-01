@@ -231,6 +231,8 @@ template
 void mtsIGTLBridge::Send<igtl::SensorMessage::Pointer>(igtl::SensorMessage::Pointer);
 template
 void mtsIGTLBridge::Send<igtl::NDArrayMessage::Pointer>(igtl::NDArrayMessage::Pointer);
+template
+void mtsIGTLBridge::Send<igtl::PointMessage::Pointer>(igtl::PointMessage::Pointer);
 
 
 // templated implementation for mtsIGTLReceiver::Execute
@@ -270,3 +272,7 @@ template
 bool mtsIGTLReceiver<igtl::SensorMessage, prmForceCartesianSet>::Execute(igtl::Socket *, igtl::MessageBase *);
 template
 bool mtsIGTLReceiver<igtl::SensorMessage, prmStateJoint>::Execute(igtl::Socket *, igtl::MessageBase *);
+template
+bool mtsIGTLReceiver<igtl::TransformMessage, prmPositionCartesianSet>::Execute(igtl::Socket *, igtl::MessageBase *);
+template
+bool mtsIGTLReceiver<igtl::PointMessage, vct3>::Execute(igtl::Socket *, igtl::MessageBase *);
