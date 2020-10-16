@@ -199,7 +199,7 @@ class CISST_EXPORT mtsIGTLBridge: public mtsTaskPeriodic
     typedef std::list<mtsIGTLSenderBase *> SendersType;
     SendersType mSenders;
 
-    typedef std::multimap<std::string, mtsIGTLReceiverBase *> ReceiversType;
+    typedef std::map<std::string, mtsIGTLReceiverBase *> ReceiversType;
     ReceiversType mReceivers;
 };
 

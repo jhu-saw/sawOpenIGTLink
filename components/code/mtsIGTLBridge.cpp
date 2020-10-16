@@ -158,13 +158,10 @@ void mtsIGTLBridge::ReceiveAll(void)
         // process message if valid
         if (sendingClientActive >= 1 && sendingClientActive == headerMsg->GetPackSize()) {
             const auto deviceName = headerMsg->GetDeviceName();
-            auto range = mReceivers.equal_range(deviceName);
-            bool hasReceiver = false;
-            for (auto receiver = range.first; receiver != range.second; ++receiver) {
-                hasReceiver = true;
+            auto receiver = mReceivers.find(deviceName);
+            if (receiver != mReceivers.end()) {
                 receiver->second->Execute(socket, headerMsg);
-            }
-            if (!hasReceiver) {
+            } else {
                 CMN_LOG_CLASS_RUN_WARNING << "ReceiveAll: not receiver known for device \""
                                           << deviceName << "\"" << std::endl;
             }
