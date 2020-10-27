@@ -162,6 +162,7 @@ void mtsIGTLBridge::ReceiveAll(void)
             if (receiver != mReceivers.end()) {
                 receiver->second->Execute(socket, headerMsg);
             } else {
+                socket->Skip(headerMsg->GetBodySizeToRead(), 0);
                 CMN_LOG_CLASS_RUN_WARNING << "ReceiveAll: not receiver known for device \""
                                           << deviceName << "\"" << std::endl;
             }
