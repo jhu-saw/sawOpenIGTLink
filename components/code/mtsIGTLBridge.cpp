@@ -20,6 +20,8 @@ http://www.cisst.org/cisst/license.txt.
 #include <sawOpenIGTLink/mtsCISSTToIGTL.h>
 #include <sawOpenIGTLink/mtsIGTLToCISST.h>
 
+#include <cisstMultiTask/mtsManagerLocal.h>
+
 #include <igtlServerSocket.h>
 #include <igtlTimeStamp.h>
 #include <igtlMessageBase.h>
@@ -100,6 +102,9 @@ void mtsIGTLBridge::Cleanup(void)
 
 void mtsIGTLBridge::Run(void)
 {
+    // keep track of when we start to make sure we stop receive loop
+    const double start = mtsComponentManager::GetInstance()->GetTimeServer().GetRelativeTime();
+    
     ProcessQueuedCommands();
     ProcessQueuedEvents();
 
@@ -122,8 +127,10 @@ void mtsIGTLBridge::Run(void)
     // update all senders
     SendAll();
 
-    // update all receivers
-    ReceiveAll();
+    // update all receivers, loop as long as we have some time
+    do {
+        ReceiveAll();
+    } while ((mtsComponentManager::GetInstance()->GetTimeServer().GetRelativeTime() - start) < this->Period);
 }
 
 void mtsIGTLBridge::SendAll(void)
