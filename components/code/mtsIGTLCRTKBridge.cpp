@@ -114,24 +114,23 @@ void mtsIGTLCRTKBridge::BridgeInterfaceProvided(const std::string & componentNam
             // get the CRTK command so we know which template type to use
             GetCRTKCommand(command, crtkCommand);
 
-        /*
-          if ((_crtk_command == "servo_jp")
-          || (_crtk_command == "move_jp")) {
-          connectionNeeded = true;
-          m_subscribers_bridge->AddSubscriberToCommandWrite<prmPositionJointSet, sensor_msgs::JointState>
-          (_requiredinterfaceName, *_command, _ros_topic);
-          } else  if (_crtk_command == "servo_jf") {
-          connectionNeeded = true;
+        /* examples from ROS CRTK, to be ported to IGTL
+          if (_crtk_command == "servo_jf") {
           m_subscribers_bridge->AddSubscriberToCommandWrite<prmForceTorqueJointSet, sensor_msgs::JointState>
-          (_requiredinterfaceName, *_command, _ros_topic);
-          } else if ((_crtk_command == "servo_cp")
-          || (_crtk_command == "move_cp")) {
-          connectionNeeded = true;
-          m_subscribers_bridge->AddSubscriberToCommandWrite<prmPositionCartesianSet, geometry_msgs::TransformStamped>
-          (_requiredinterfaceName, *_command, _ros_topic);
-          } else
         */
-            if (crtkCommand == "servo_cf") {
+            if ((crtkCommand == "servo_jp")
+                || (crtkCommand == "servo_jr")
+                || (crtkCommand == "move_jp")
+                || (crtkCommand == "move_jr")) {
+                connectionNeeded = true;
+                AddReceiverToCommandWrite<igtl::SensorMessage, prmPositionJointSet>
+                    (requiredInterfaceName, command, nameSpace + '/' + command);
+            } else if ((crtkCommand == "servo_cp")
+                       || (crtkCommand == "move_cp")) {
+                connectionNeeded = true;
+                AddReceiverToCommandWrite<igtl::TransformMessage, prmPositionCartesianSet>
+                    (requiredInterfaceName, command, nameSpace + '/' + command);
+            } else if (crtkCommand == "servo_cf") {
                 connectionNeeded = true;
                 AddReceiverToCommandWrite<igtl::SensorMessage, prmForceCartesianSet>
                     (requiredInterfaceName, command, nameSpace + '/' + command);

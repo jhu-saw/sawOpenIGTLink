@@ -25,6 +25,17 @@ bool mtsIGTLToCISST(const igtl::StringMessage::Pointer igtlData,
     return true;
 }
 
+bool mtsIGTLToCISST(const igtl::SensorMessage::Pointer & igtlData,
+                    prmPositionJointSet & cisstData)
+{
+   const unsigned int length = igtlData->GetLength();
+   cisstData.Goal().SetSize(length);
+   for (unsigned int index = 0; index < length; ++index) {
+       cisstData.Goal().Element(index) = igtlData->GetValue(index);
+   }
+   return true;
+}
+
 bool mtsIGTLToCISST(const igtl::Matrix4x4 & igtlData,
                    prmPositionCartesianSet & cisstData)
 {
@@ -55,10 +66,9 @@ bool mtsIGTLToCISST(const igtl::TransformMessage::Pointer igtlData,
 {
     igtl::Matrix4x4 m;
     igtlData->GetMatrix(m);
-    if (mtsIGTLToCISST(m,cisstData)){
+    if (mtsIGTLToCISST(m, cisstData)){
         return true;
     }
-
     return false;
 }
 
@@ -86,12 +96,11 @@ bool mtsIGTLToCISST(const igtl::PointMessage::Pointer igtlData, vct3 &cisstData)
 {
     igtl::PointElement::Pointer p;
     p = igtl::PointElement::New();
-    igtlData->GetPointElement(0,p);
-    float x,y,z;
-    p->GetPosition(x,y,z);
+    igtlData->GetPointElement(0, p);
+    float x, y, z;
+    p->GetPosition(x, y, z);
     cisstData[0] = x;
     cisstData[1] = y;
     cisstData[2] = z;
-
     return true;
 }
