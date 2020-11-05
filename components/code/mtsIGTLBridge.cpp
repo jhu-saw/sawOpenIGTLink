@@ -104,7 +104,7 @@ void mtsIGTLBridge::Run(void)
 {
     // keep track of when we start to make sure we stop receive loop
     const double start = mtsComponentManager::GetInstance()->GetTimeServer().GetRelativeTime();
-    
+
     ProcessQueuedCommands();
     ProcessQueuedEvents();
 
@@ -277,6 +277,8 @@ template
 bool mtsIGTLReceiver<igtl::SensorMessage, prmForceCartesianSet>::Execute(igtl::Socket *, igtl::MessageBase *);
 template
 bool mtsIGTLReceiver<igtl::SensorMessage, prmStateJoint>::Execute(igtl::Socket *, igtl::MessageBase *);
+template
+bool mtsIGTLReceiver<igtl::SensorMessage, prmPositionJointSet>::Execute(igtl::Socket *, igtl::MessageBase *);
 template
 bool mtsIGTLReceiver<igtl::TransformMessage, prmPositionCartesianSet>::Execute(igtl::Socket *, igtl::MessageBase *);
 template
