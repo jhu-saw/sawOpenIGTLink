@@ -64,6 +64,8 @@ void mtsIGTLBridge::Configure(const std::string & jsonFile)
         return;
     }
 
+    // call base class configure for log configuration
+    mtsComponent::ConfigureJSON(jsonConfig);
     ConfigureJSON(jsonConfig);
 
     InitServer();
