@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2020 Johns Hopkins University (JHU), All Rights Reserved.
+# (C) Copyright 2011-2021 Johns Hopkins University (JHU), All Rights Reserved.
 #
 # --- begin cisst license - do not edit ---
 #
@@ -25,7 +25,7 @@ if (SAW_OPEN_IGT_LINK_HAS_cisstStereoVision)
   set (REQUIRED_CISST_LIBRARIES ${REQUIRED_CISST_LIBRARIES} cisstStereoVision)
 endif ()
 
-find_package (cisst 1.0.9 COMPONENTS ${REQUIRED_CISST_LIBRARIES})
+find_package (cisst 1.1.0 COMPONENTS ${REQUIRED_CISST_LIBRARIES})
 
 if (cisst_FOUND_AS_REQUIRED)
 
@@ -57,8 +57,8 @@ if (cisst_FOUND_AS_REQUIRED)
 
     # Set the version number
     set (sawOpenIGTLink_VERSION_MAJOR "1")
-    set (sawOpenIGTLink_VERSION_MINOR "1")
-    set (sawOpenIGTLink_VERSION_PATCH "1")
+    set (sawOpenIGTLink_VERSION_MINOR "2")
+    set (sawOpenIGTLink_VERSION_PATCH "0")
     set (sawOpenIGTLink_VERSION "${sawOpenIGTLink_VERSION_MAJOR}.${sawOpenIGTLink_VERSION_MINOR}.${sawOpenIGTLink_VERSION_PATCH}")
     # Generate sawOpenIGTLinkRevision.h
     configure_file ("${sawOpenIGTLink_SOURCE_DIR}/code/sawOpenIGTLinkRevision.h.in"
