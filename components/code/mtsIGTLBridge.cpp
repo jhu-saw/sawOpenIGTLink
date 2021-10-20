@@ -5,7 +5,7 @@
   Author(s):  Youri Tan, Anton Deguet
   Created on: 2015-07-24
 
-  (C) Copyright 2009-2020 Johns Hopkins University (JHU), All Rights Reserved.
+  (C) Copyright 2009-2021 Johns Hopkins University (JHU), All Rights Reserved.
 
 --- begin cisst license - do not edit ---
 
@@ -158,10 +158,12 @@ void mtsIGTLBridge::ReceiveAll(void)
         headerMsg = igtl::MessageHeader::New();
 
         // keep track of which client we can send to
+        bool timeout(false);
         headerMsg->InitPack();
         int sendingClientActive =
             socket->Receive(headerMsg->GetPackPointer(),
-                            headerMsg->GetPackSize());
+                            headerMsg->GetPackSize(),
+                            timeout);
         headerMsg->Unpack();
 
         // process message if valid
@@ -251,7 +253,10 @@ bool mtsIGTLReceiver<_igtlType, _cisstType>::Execute(igtl::Socket * socket,
     message = _igtlType::New();
     message->SetMessageHeader(header);
     message->AllocatePack();
-    socket->Receive(message->GetPackBodyPointer(), message->GetPackBodySize());
+    bool timeout(false);
+    socket->Receive(message->GetPackBodyPointer(),
+                    message->GetPackBodySize(),
+                    timeout);
     int c = message->Unpack(1);
     if (c & igtl::MessageHeader::UNPACK_BODY) {
         // convert igtl message to cisst type
