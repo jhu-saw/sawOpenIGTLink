@@ -160,7 +160,7 @@ void mtsIGTLBridge::ReceiveAll(void)
         // keep track of which client we can send to
         bool timeout(false);
         headerMsg->InitPack();
-        int sendingClientActive =
+        auto sendingClientActive =
             socket->Receive(headerMsg->GetPackPointer(),
                             headerMsg->GetPackSize(),
                             timeout);
