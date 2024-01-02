@@ -1,0 +1,4 @@
+{
+  "name": "sawOpenIGTLinkAll",
+  "dependencies": ["cisst"]
+}

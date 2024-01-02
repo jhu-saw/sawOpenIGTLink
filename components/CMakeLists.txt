@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2021 Johns Hopkins University (JHU), All Rights Reserved.
+# (C) Copyright 2011-2024 Johns Hopkins University (JHU), All Rights Reserved.
 #
 # --- begin cisst license - do not edit ---
 #
@@ -9,11 +9,8 @@
 #
 # --- end cisst license ---
 
-project (sawOpenIGTLink)
-
-cmake_minimum_required (VERSION 2.8)
-
-option (SAW_OPEN_IGT_LINK_HAS_cisstStereoVision "Build cisstStereoVision support for igtl (experimental)" OFF)
+cmake_minimum_required (VERSION 3.10)
+project (sawOpenIGTLink VERSION 1.3.0)
 
 set (REQUIRED_CISST_LIBRARIES cisstCommon
                               cisstVector
@@ -21,11 +18,7 @@ set (REQUIRED_CISST_LIBRARIES cisstCommon
                               cisstMultiTask
                               cisstParameterTypes)
 
-if (SAW_OPEN_IGT_LINK_HAS_cisstStereoVision)
-  set (REQUIRED_CISST_LIBRARIES ${REQUIRED_CISST_LIBRARIES} cisstStereoVision)
-endif ()
-
-find_package (cisst 1.1.0 COMPONENTS ${REQUIRED_CISST_LIBRARIES})
+find_package (cisst 1.2.1 COMPONENTS ${REQUIRED_CISST_LIBRARIES})
 
 if (cisst_FOUND_AS_REQUIRED)
 
@@ -41,38 +34,23 @@ if (cisst_FOUND_AS_REQUIRED)
     include (${OpenIGTLink_USE_FILE})
 
     # catkin/ROS paths
-    cisst_is_catkin_build (sawOpenIGTLink_IS_CATKIN_BUILT)
-    if (sawOpenIGTLink_IS_CATKIN_BUILT)
-       set (sawOpenIGTLink_CONFIG_FILE_DIR
-            "${CATKIN_DEVEL_PREFIX}/share/sawOpenIGTLink/cmake")
-       set (LIBRARY_OUTPUT_PATH "${CATKIN_DEVEL_PREFIX}/lib")
-    else ()
-       set (sawOpenIGTLink_CONFIG_FILE_DIR "${sawOpenIGTLink_BINARY_DIR}")
-    endif ()
+    cisst_set_output_path ()
 
     # create/configure file for find_package (sawOpenIGTLink)
-    set (sawOpenIGTLink_INCLUDE_DIR "${sawOpenIGTLink_SOURCE_DIR}/include")
+    set (sawOpenIGTLink_INCLUDE_DIR
+      "${sawOpenIGTLink_SOURCE_DIR}/include"
+      "${sawOpenIGTLink_BINARY_DIR}/include")
+    set (sawOpenIGTLink_HEADER_DIR "${sawOpenIGTLink_SOURCE_DIR}/include/sawOpenIGTLink")
     set (sawOpenIGTLink_LIBRARY_DIR "${LIBRARY_OUTPUT_PATH}" "${OpenIGTLink_LIBRARY_DIRS}")
     set (sawOpenIGTLink_LIBRARIES sawOpenIGTLink ${OpenIGTLink_LIBRARIES})
 
-    # Set the version number
-    set (sawOpenIGTLink_VERSION_MAJOR "1")
-    set (sawOpenIGTLink_VERSION_MINOR "2")
-    set (sawOpenIGTLink_VERSION_PATCH "0")
-    set (sawOpenIGTLink_VERSION "${sawOpenIGTLink_VERSION_MAJOR}.${sawOpenIGTLink_VERSION_MINOR}.${sawOpenIGTLink_VERSION_PATCH}")
-    # Generate sawOpenIGTLinkRevision.h
-    configure_file ("${sawOpenIGTLink_SOURCE_DIR}/code/sawOpenIGTLinkRevision.h.in"
-                    "${sawOpenIGTLink_BINARY_DIR}/include/sawOpenIGTLink/sawOpenIGTLinkRevision.h")
+    # Allow c++ code to find local header files
+    include_directories (${sawOpenIGTLink_INCLUDE_DIR} ${sawOpenIGTLink_BINARY_DIR})
 
-    include_directories (${sawOpenIGTLink_INCLUDE_DIR})
+    cisst_add_config_files (sawOpenIGTLink)
 
-    set (sawOpenIGTLink_HEADER_DIR "${sawOpenIGTLink_INCLUDE_DIR}/sawOpenIGTLink")
     set (sawOpenIGTLink_SRC
          ${sawOpenIGTLink_HEADER_DIR}/sawOpenIGTLinkExport.h
-         # old implementation
-         code/mtsOpenIGTLink.cpp
-         ${sawOpenIGTLink_HEADER_DIR}/mtsOpenIGTLink.h
-         # new implementation (05/2015)
          code/mtsCISSTToIGTL.cpp
          ${sawOpenIGTLink_HEADER_DIR}/mtsCISSTToIGTL.h
          code/mtsIGTLToCISST.cpp
@@ -82,46 +60,26 @@ if (cisst_FOUND_AS_REQUIRED)
          code/mtsIGTLCRTKBridge.cpp
          ${sawOpenIGTLink_HEADER_DIR}/mtsIGTLCRTKBridge.h)
 
-    if (SAW_OPEN_IGT_LINK_HAS_cisstStereoVision)
-      set (sawOpenIGTLink_SRC
-           ${sawOpenIGTLink_SRC}
-           code/svlOpenIGTLinkBridge.cpp
-           ${sawOpenIGTLink_HEADER_DIR}/svlOpenIGTLinkBridge.h)
-    endif ()
-
     add_library (sawOpenIGTLink ${IS_SHARED}
                  ${sawOpenIGTLink_SRC})
 
-    set_property (TARGET sawOpenIGTLink PROPERTY FOLDER "sawOpenIGTLink")
+    set_target_properties (sawOpenIGTLink PROPERTIES
+      VERSION ${sawOpenIGTLink_VERSION}
+      FOLDER "sawOpenIGTLink")
     target_link_libraries (sawOpenIGTLink ${OpenIGTLink_LIBRARIES})
     cisst_target_link_libraries (sawOpenIGTLink ${REQUIRED_CISST_LIBRARIES})
 
-    set (sawOpenIGTLink_CMAKE_CONFIG_FILE
-         "${sawOpenIGTLink_CONFIG_FILE_DIR}/sawOpenIGTLinkConfig.cmake")
-
-    configure_file ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/sawOpenIGTLinkConfig.cmake.in"
-                    "${sawOpenIGTLink_CMAKE_CONFIG_FILE}"
-                     @ONLY)
-
-    cisst_add_config_version ("${sawOpenIGTLink_CONFIG_FILE_DIR}/sawOpenIGTLinkConfigVersion.cmake"
-                              VERSION ${sawOpenIGTLink_VERSION}
-                              DESTINATION ${CISST_CMAKE_INSTALL_SUFFIX}/saw
-                              COMPONENT sawOpenIGTLink)
-
     # Install target for headers and library
     install (DIRECTORY
-             ${sawOpenIGTLink_INCLUDE_DIR}/sawOpenIGTLink
+             ${sawOpenIGTLink_SOURCE_DIR}/include/sawOpenIGTLink
              ${sawOpenIGTLink_BINARY_DIR}/include/sawOpenIGTLink
              DESTINATION include
-             PATTERN .svn EXCLUDE)
+             COMPONENT sawOpenIGTLink-dev)
 
-    install (TARGETS sawOpenIGTLink
+    install (TARGETS sawOpenIGTLink COMPONENT sawOpenIGTLink
              RUNTIME DESTINATION bin
              LIBRARY DESTINATION lib
              ARCHIVE DESTINATION lib)
-
-    install (FILES "${sawOpenIGTLink_BINARY_DIR}/sawOpenIGTLinkConfig.cmake"
-             DESTINATION "${CISST_CMAKE_INSTALL_SUFFIX}/saw")
 
   else (OpenIGTLink_FOUND)
     message ("Information: code in ${CMAKE_CURRENT_SOURCE_DIR} requires OpenIGTLink.  Please install OpenIGTLink.  You might also have to set the OpenIGTLink directory manually using CMake, e.g. ccmake ${CMAKE_CURRENT_BINARY_DIR}")
