@@ -9,8 +9,8 @@
 #
 # --- end cisst license ---
 
-cmake_minimum_required(VERSION 3.10)
-project (sawOpenIGTLinkAll VERSION 1.3.0)
+cmake_minimum_required(VERSION 3.16)
+project (sawOpenIGTLinkAll VERSION 1.4.0)
 
 find_package (cisst REQUIRED)
 cisst_cpack_settings (
